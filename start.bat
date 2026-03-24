@@ -4,11 +4,8 @@ REM Starts Python daemon and AHK hotkey script
 
 cd /d "%~dp0"
 
-REM Activate venv
-call venv\Scripts\activate.bat
-
-REM Start daemon in background
-start /B "" python daemon.py
+REM Start daemon in background (expliziter venv-Pfad)
+start /B "" "%~dp0venv\Scripts\python.exe" "%~dp0daemon.py"
 
 REM Wait for daemon to be ready (check if port 9876 is listening)
 echo Waiting for daemon...
@@ -20,7 +17,7 @@ if %ATTEMPTS% GEQ 30 (
     echo ERROR: Daemon did not start within 30 seconds.
     exit /b 1
 )
-powershell -Command "Test-NetConnection -ComputerName localhost -Port 9876 -InformationLevel Quiet" | findstr /C:"True" >nul 2>&1
+netstat -an | findstr "127.0.0.1:9876" | findstr "LISTENING" >nul 2>&1
 if errorlevel 1 goto wait_loop
 echo Daemon ready.
 
