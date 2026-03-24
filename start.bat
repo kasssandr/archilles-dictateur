@@ -17,7 +17,7 @@ if %ATTEMPTS% GEQ 30 (
     echo ERROR: Daemon did not start within 30 seconds.
     exit /b 1
 )
-netstat -an | findstr "127.0.0.1:9876" | findstr "LISTENING" >nul 2>&1
+netstat -an | findstr "127.0.0.1:9876" >nul 2>&1
 if errorlevel 1 goto wait_loop
 echo Daemon ready.
 
