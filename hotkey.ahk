@@ -1,5 +1,5 @@
 ; hotkey.ahk — Archilles Diktator AHK v2 Client
-; Ctrl+Win hold = record, release = stop + transcribe + paste
+; RAlt hold = record, release = stop + transcribe + paste
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 
@@ -102,10 +102,10 @@ SocketClose(s) {
     DllCall("ws2_32\closesocket", "UInt", s)
 }
 
-; --- Hotkey: Ctrl+Win ---
+; --- Hotkey: RAlt (rechte Alt-Taste) ---
 
 ; Key down: start recording
-LAlt & LWin:: {
+RAlt:: {
     global isRecording, isConnected, sock
     if isRecording || !isConnected
         return
@@ -120,7 +120,7 @@ LAlt & LWin:: {
 }
 
 ; Key up: stop recording, receive text, paste
-LAlt & LWin up:: {
+RAlt up:: {
     global isRecording, isConnected, sock
     if !isRecording
         return
@@ -134,8 +134,7 @@ LAlt & LWin up:: {
             text := SubStr(response, 8)
             if text != "" {
                 A_Clipboard := text
-                KeyWait("LAlt")
-                KeyWait("LWin")
+                KeyWait("RAlt")
                 Sleep(50)
                 SendInput("^v")
             }
