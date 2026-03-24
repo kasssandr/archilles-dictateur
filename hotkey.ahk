@@ -105,7 +105,7 @@ SocketClose(s) {
 ; --- Hotkey: Ctrl+Win ---
 
 ; Key down: start recording
-~LCtrl & LWin:: {
+~LAlt & LWin:: {
     global isRecording, isConnected, sock
     if isRecording || !isConnected
         return
@@ -120,7 +120,7 @@ SocketClose(s) {
 }
 
 ; Key up: stop recording, receive text, paste
-~LCtrl & LWin up:: {
+~LAlt & LWin up:: {
     global isRecording, isConnected, sock
     if !isRecording
         return
