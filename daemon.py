@@ -9,14 +9,14 @@ from dataclasses import dataclass, field
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-# NVIDIA DLL-Verzeichnisse registrieren (Windows: cublas64_12.dll etc.)
+# NVIDIA DLL-Verzeichnisse in PATH eintragen (Windows: cublas64_12.dll etc.)
 for _sp in site.getsitepackages():
     _nvidia = os.path.join(_sp, "nvidia")
     if os.path.isdir(_nvidia):
         for _pkg in os.listdir(_nvidia):
             _bin = os.path.join(_nvidia, _pkg, "bin")
             if os.path.isdir(_bin):
-                os.add_dll_directory(_bin)
+                os.environ["PATH"] = _bin + os.pathsep + os.environ["PATH"]
 
 import numpy as np
 import sounddevice as sd
