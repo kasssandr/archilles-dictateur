@@ -29,11 +29,11 @@ class DaemonConfig:
 # --- Logging ---
 
 def setup_logging() -> logging.Logger:
-    log_dir = Path.home() / "AppData" / "Roaming" / "achilles-diktator"
+    log_dir = Path.home() / "AppData" / "Roaming" / "archilles-diktator"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "daemon.log"
 
-    logger = logging.getLogger("achilles")
+    logger = logging.getLogger("archilles")
     logger.setLevel(logging.INFO)
 
     handler = RotatingFileHandler(log_file, maxBytes=1_000_000, backupCount=1)

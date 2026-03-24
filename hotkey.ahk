@@ -1,4 +1,4 @@
-; hotkey.ahk — Achilles Diktator AHK v2 Client
+; hotkey.ahk — Archilles Diktator AHK v2 Client
 ; Ctrl+Win hold = record, release = stop + transcribe + paste
 #Requires AutoHotkey v2.0
 #SingleInstance Force
@@ -105,7 +105,7 @@ SocketClose(s) {
 ; --- Hotkey: Ctrl+Win ---
 
 ; Key down: start recording
-~LAlt & LWin:: {
+LAlt & LWin:: {
     global isRecording, isConnected, sock
     if isRecording || !isConnected
         return
@@ -120,7 +120,7 @@ SocketClose(s) {
 }
 
 ; Key up: stop recording, receive text, paste
-~LAlt & LWin up:: {
+LAlt & LWin up:: {
     global isRecording, isConnected, sock
     if !isRecording
         return
@@ -134,8 +134,10 @@ SocketClose(s) {
             text := SubStr(response, 8)
             if text != "" {
                 A_Clipboard := text
+                KeyWait("LAlt")
+                KeyWait("LWin")
                 Sleep(50)
-                Send("^v")
+                SendInput("^v")
             }
         }
     } catch {

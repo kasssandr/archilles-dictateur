@@ -1,5 +1,5 @@
 @echo off
-REM Achilles Diktator — Stop Script
+REM Archilles Diktator — Stop Script
 REM Beendet Daemon und AHK-Script
 
 REM AHK-Prozess beenden
@@ -17,4 +17,4 @@ if defined PID (
 REM Alternativ: alle python-Prozesse die daemon.py laufen haben
 powershell -Command "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*daemon.py*' } | Stop-Process -Force" >nul 2>&1
 
-echo Achilles Diktator gestoppt.
+echo Archilles Diktator gestoppt.

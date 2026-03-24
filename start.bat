@@ -1,5 +1,5 @@
 @echo off
-REM Achilles Diktator — Start Script
+REM Archilles Diktator — Start Script
 REM Starts Python daemon and AHK hotkey script
 
 cd /d "%~dp0"
@@ -25,6 +25,7 @@ if errorlevel 1 goto wait_loop
 echo Daemon ready.
 
 REM Start AHK script (GUI process, no console window)
-start "" "hotkey.ahk"
+set AHK="%LOCALAPPDATA%\Programs\AutoHotkey\v2\AutoHotkey64.exe"
+start "" %AHK% "%~dp0hotkey.ahk"
 
-echo Achilles Diktator running.
+echo Archilles Diktator running.
