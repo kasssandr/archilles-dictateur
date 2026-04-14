@@ -9,14 +9,19 @@ from dataclasses import dataclass, field
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-# NVIDIA DLL-Verzeichnisse in PATH eintragen (Windows: cublas64_12.dll etc.)
-for _sp in site.getsitepackages():
-    _nvidia = os.path.join(_sp, "nvidia")
-    if os.path.isdir(_nvidia):
-        for _pkg in os.listdir(_nvidia):
-            _bin = os.path.join(_nvidia, _pkg, "bin")
-            if os.path.isdir(_bin):
-                os.environ["PATH"] = _bin + os.pathsep + os.environ["PATH"]
+# NVIDIA DLL-Verzeichnisse registrieren (Windows: cublas64_12.dll etc.)
+if sys.platform == "win32":
+    for _sp in site.getsitepackages():
+        _nvidia = os.path.join(_sp, "nvidia")
+        if os.path.isdir(_nvidia):
+            for _pkg in os.listdir(_nvidia):
+                _bin = os.path.join(_nvidia, _pkg, "bin")
+                if os.path.isdir(_bin):
+                    try:
+                        os.add_dll_directory(_bin)
+                    except Exception:
+                        pass
+                    os.environ["PATH"] = _bin + os.pathsep + os.environ["PATH"]
 
 import numpy as np
 import sounddevice as sd
@@ -72,6 +77,8 @@ class AudioRecorder:
             self._buffer.append(indata[:, 0].copy())
 
     def start(self):
+        if self.is_recording:
+            return
         self._buffer = []
         self.is_recording = True
         self._stream = sd.InputStream(
@@ -83,11 +90,15 @@ class AudioRecorder:
         self._stream.start()
 
     def stop(self) -> np.ndarray:
-        self.is_recording = False
+        if not self.is_recording:
+            return np.array([], dtype=np.float32)
+        
         if self._stream is not None:
             self._stream.stop()
             self._stream.close()
             self._stream = None
+        
+        self.is_recording = False
         if not self._buffer:
             return np.array([], dtype=np.float32)
         return np.concatenate(self._buffer)
@@ -114,6 +125,7 @@ class DaemonServer:
         self.recorder = AudioRecorder(sample_rate=config.sample_rate)
         self.transcriber = None
         self._server_socket = None
+        self._current_conn = None
 
     def _load_model(self):
         try:
@@ -133,6 +145,7 @@ class DaemonServer:
 
     def _handle_client(self, conn: socket.socket):
         self.logger.info("Client connected")
+        self._current_conn = conn
         stream = conn.makefile("rwb")
         try:
             while self.running:
@@ -166,9 +179,13 @@ class DaemonServer:
                         send_message(stream, f"ERROR:TRANSCRIPTION:{e}")
         except (ConnectionResetError, BrokenPipeError):
             self.logger.info("Client disconnected")
+        except OSError:
+            # Occurs when socket is closed during shutdown
+            pass
         finally:
             stream.close()
             conn.close()
+            self._current_conn = None
 
     def start(self):
         self._load_model()
@@ -200,6 +217,12 @@ class DaemonServer:
         self.running = False
         if self.recorder.is_recording:
             self.recorder.stop()
+        if self._current_conn:
+            try:
+                self._current_conn.shutdown(socket.SHUT_RDWR)
+                self._current_conn.close()
+            except OSError:
+                pass
         if self._server_socket:
             self._server_socket.close()
 

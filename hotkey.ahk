@@ -1,5 +1,5 @@
 ; hotkey.ahk — Archilles Diktator AHK v2 Client
-; RAlt hold = record, release = stop + transcribe + paste
+; Ctrl+Win hold = record, release = stop + transcribe + paste
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 
@@ -21,6 +21,8 @@ Connect() {
         sock := SocketCreate()
         SocketConnect(sock, HOST, PORT)
         isConnected := true
+        ToolTip("Diktator: Verbunden")
+        SetTimer(() => ToolTip(), -2000)
     } catch {
         isConnected := false
         SetTimer(TryReconnect, -RECONNECT_INTERVAL)
@@ -102,46 +104,53 @@ SocketClose(s) {
     DllCall("ws2_32\closesocket", "UInt", s)
 }
 
-; --- Hotkey: RAlt (rechte Alt-Taste) ---
+; --- Hotkey: Ctrl+Win (LWin preferred) ---
 
-; Key down: start recording
-RAlt:: {
+^LWin:: {
     global isRecording, isConnected, sock
     if isRecording || !isConnected
         return
     isRecording := true
     try {
         SendMsg(sock, "START")
+        ToolTip("🎤 Aufnahme...")
     } catch {
         isRecording := false
         global isConnected := false
         SetTimer(TryReconnect, -RECONNECT_INTERVAL)
+        ToolTip("❌ Fehler: Verbindung verloren")
+        SetTimer(() => ToolTip(), -2000)
     }
 }
 
-; Key up: stop recording, receive text, paste
-RAlt up:: {
+^LWin up:: {
     global isRecording, isConnected, sock
     if !isRecording
         return
     isRecording := false
+    ToolTip("⌛ Transkribiere...")
 
     try {
         SendMsg(sock, "STOP")
         response := RecvMsg(sock)
+        ToolTip()
 
         if SubStr(response, 1, 7) = "RESULT:" {
             text := SubStr(response, 8)
             if text != "" {
                 A_Clipboard := text
-                KeyWait("RAlt")
                 Sleep(50)
                 SendInput("^v")
             }
+        } else if SubStr(response, 1, 6) = "ERROR:" {
+            ToolTip("❌ " . SubStr(response, 7))
+            SetTimer(() => ToolTip(), -3000)
         }
     } catch {
         global isConnected := false
         SetTimer(TryReconnect, -RECONNECT_INTERVAL)
+        ToolTip("❌ Verbindung verloren")
+        SetTimer(() => ToolTip(), -2000)
     }
 }
 
