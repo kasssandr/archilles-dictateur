@@ -45,7 +45,7 @@ class DaemonConfig:
 # --- Logging ---
 
 def setup_logging() -> logging.Logger:
-    log_dir = Path.home() / "AppData" / "Roaming" / "archilles-diktator"
+    log_dir = Path.home() / "AppData" / "Roaming" / "archilles-dictator"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "daemon.log"
 
