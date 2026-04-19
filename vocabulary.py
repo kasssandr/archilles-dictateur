@@ -63,7 +63,7 @@ def _parse_vocabulary(raw: str, logger: logging.Logger) -> str:
         line = line.strip()
         if not line:
             continue
-        for tok in re.split(r"[,\s]+", line):
+        for tok in line.split(","):
             tok = tok.strip()
             if tok:
                 tokens.append(tok)

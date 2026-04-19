@@ -127,17 +127,30 @@ def test_missing_corrections_section_ok(tmp_path: Path, logger):
     assert corrections == {}
 
 
-def test_vocabulary_mixed_separators(tmp_path: Path, logger):
+def test_vocabulary_comma_separates_entries(tmp_path: Path, logger):
     md = tmp_path / "vocab.md"
     md.write_text(
         "## Vokabular\n"
-        "Claude, Anthropic,Archilles\n"
-        "Obsidian Ollama\n",
+        "Claude, Anthropic,Archilles\n",
         encoding="utf-8",
     )
     prompt, corrections = parse_vocabulary_file(md, logger)
-    tokens = set(prompt.split(", "))
-    assert tokens == {"Claude", "Anthropic", "Archilles", "Obsidian", "Ollama"}
+    assert set(prompt.split(", ")) == {"Claude", "Anthropic", "Archilles"}
+
+
+def test_vocabulary_preserves_phrases(tmp_path: Path, logger):
+    md = tmp_path / "vocab.md"
+    md.write_text(
+        "## Vokabular\n"
+        "Claude Code, fasse Kapitel zusammen\n"
+        "Archilles Dictator\n",
+        encoding="utf-8",
+    )
+    prompt, corrections = parse_vocabulary_file(md, logger)
+    tokens = prompt.split(", ")
+    assert "Claude Code" in tokens
+    assert "fasse Kapitel zusammen" in tokens
+    assert "Archilles Dictator" in tokens
 
 
 def test_vocabulary_too_long_is_truncated(tmp_path: Path, logger, caplog):
