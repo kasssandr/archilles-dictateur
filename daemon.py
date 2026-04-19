@@ -9,6 +9,9 @@ from dataclasses import dataclass, field
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from post_processor import apply_corrections
+from vocabulary import VocabularyStore
+
 # NVIDIA DLL-Verzeichnisse registrieren (Windows: cublas64_12.dll etc.)
 if sys.platform == "win32":
     for _sp in site.getsitepackages():
@@ -40,6 +43,7 @@ class DaemonConfig:
     sample_rate: int = 16000
     device: str = "cuda"
     compute_type: str = "float16"
+    vocabulary_path: Path | None = None
 
 
 # --- Logging ---
@@ -110,8 +114,11 @@ class TranscriptionService:
     def __init__(self, model_size: str = "small", device: str = "cuda", compute_type: str = "float16"):
         self.model = WhisperModel(model_size, device=device, compute_type=compute_type)
 
-    def transcribe(self, audio: np.ndarray, language: str = "de") -> str:
-        segments, _ = self.model.transcribe(audio, language=language)
+    def transcribe(self, audio: np.ndarray, language: str = "de", initial_prompt: str = "") -> str:
+        kwargs = {"language": language}
+        if initial_prompt:
+            kwargs["initial_prompt"] = initial_prompt
+        segments, _ = self.model.transcribe(audio, **kwargs)
         return "".join(seg.text for seg in segments).strip()
 
 
@@ -123,6 +130,7 @@ class DaemonServer:
         self.logger = setup_logging()
         self.running = False
         self.recorder = AudioRecorder(sample_rate=config.sample_rate)
+        self.vocabulary = VocabularyStore(config.vocabulary_path, self.logger)
         self.transcriber = None
         self._server_socket = None
         self._current_conn = None
@@ -171,7 +179,13 @@ class DaemonServer:
                         continue
 
                     try:
-                        text = self.transcriber.transcribe(audio, language=self.config.language)
+                        prompt = self.vocabulary.get_prompt()
+                        text = self.transcriber.transcribe(
+                            audio,
+                            language=self.config.language,
+                            initial_prompt=prompt,
+                        )
+                        text = apply_corrections(text, self.vocabulary.get_corrections())
                         self.logger.info("Transcribed: %s", text)
                         send_message(stream, f"RESULT:{text}")
                     except Exception as e:
@@ -217,6 +231,7 @@ class DaemonServer:
         self.running = False
         if self.recorder.is_recording:
             self.recorder.stop()
+        self.vocabulary.stop()
         if self._current_conn:
             try:
                 self._current_conn.shutdown(socket.SHUT_RDWR)
@@ -228,7 +243,9 @@ class DaemonServer:
 
 
 def main():
-    config = DaemonConfig()
+    vocab_env = os.environ.get("ARCHILLES_VOCABULARY_PATH")
+    vocabulary_path = Path(vocab_env) if vocab_env else None
+    config = DaemonConfig(vocabulary_path=vocabulary_path)
     server = DaemonServer(config)
 
     def signal_handler(sig, frame):
