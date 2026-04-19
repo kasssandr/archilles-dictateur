@@ -4,6 +4,8 @@ REM Starts Python daemon and AHK hotkey script
 
 cd /d "%~dp0"
 
+set ARCHILLES_VOCABULARY_PATH=D:\Archilles-Lab\Dictator\Vokabular.md
+
 REM Start daemon in background (expliziter venv-Pfad)
 start /B "" "%~dp0venv\Scripts\python.exe" "%~dp0daemon.py"
 
