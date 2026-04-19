@@ -1,6 +1,10 @@
 import logging
 import re
+import threading
 from pathlib import Path
+
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 MAX_PROMPT_WORDS = 150
 
@@ -91,3 +95,80 @@ def _parse_corrections(raw: str, logger: logging.Logger) -> dict[str, str]:
             continue
         result[wrong] = right
     return result
+
+
+class VocabularyStore:
+    """Owns the parsed vocabulary state and keeps it in sync with a file.
+
+    Uses watchdog to observe the containing directory for changes. Reloads
+    on any modify/create event targeting the configured file. All reads are
+    thread-safe and return defensive copies of mutable state.
+    """
+
+    def __init__(self, path: Path | None, logger: logging.Logger):
+        self._path = path
+        self._logger = logger
+        self._lock = threading.Lock()
+        self._prompt = ""
+        self._corrections: dict[str, str] = {}
+        self._observer: Observer | None = None
+
+        if path is None:
+            logger.info("No vocabulary path configured; store will remain empty.")
+            return
+
+        self._reload()
+        self._start_watching()
+
+    def get_prompt(self) -> str:
+        with self._lock:
+            return self._prompt
+
+    def get_corrections(self) -> dict[str, str]:
+        with self._lock:
+            return dict(self._corrections)
+
+    def stop(self) -> None:
+        if self._observer is not None:
+            self._observer.stop()
+            self._observer.join(timeout=2.0)
+            self._observer = None
+
+    def _reload(self) -> None:
+        assert self._path is not None
+        prompt, corrections = parse_vocabulary_file(self._path, self._logger)
+        with self._lock:
+            self._prompt = prompt
+            self._corrections = corrections
+        self._logger.info(
+            "Vocabulary loaded: %d prompt tokens, %d corrections",
+            len(prompt.split(", ")) if prompt else 0,
+            len(corrections),
+        )
+
+    def _start_watching(self) -> None:
+        assert self._path is not None
+        watch_dir = self._path.parent
+        if not watch_dir.exists():
+            self._logger.warning(
+                "Vocabulary directory %s does not exist; watcher not started.",
+                watch_dir,
+            )
+            return
+
+        store = self
+
+        class Handler(FileSystemEventHandler):
+            def on_any_event(self, event):
+                if event.is_directory:
+                    return
+                if Path(event.src_path).resolve() != store._path.resolve():
+                    return
+                try:
+                    store._reload()
+                except Exception as e:
+                    store._logger.error("Reload failed: %s", e)
+
+        self._observer = Observer()
+        self._observer.schedule(Handler(), str(watch_dir), recursive=False)
+        self._observer.start()

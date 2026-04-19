@@ -1,9 +1,19 @@
 import logging
+import time
 from pathlib import Path
 
 import pytest
 
-from vocabulary import parse_vocabulary_file
+from vocabulary import VocabularyStore, parse_vocabulary_file
+
+
+def _wait_for(predicate, timeout=3.0, interval=0.05):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if predicate():
+            return True
+        time.sleep(interval)
+    return False
 
 
 @pytest.fixture
@@ -138,3 +148,65 @@ def test_vocabulary_too_long_is_truncated(tmp_path: Path, logger, caplog):
         prompt, _ = parse_vocabulary_file(md, logger)
     assert len(prompt.split(", ")) <= 150
     assert any("gekürzt" in r.message.lower() or "truncat" in r.message.lower() for r in caplog.records)
+
+
+# --- VocabularyStore tests ---
+
+
+def test_store_none_path_yields_empty():
+    store = VocabularyStore(None, logging.getLogger("test"))
+    try:
+        assert store.get_prompt() == ""
+        assert store.get_corrections() == {}
+    finally:
+        store.stop()
+
+
+def test_store_loads_initial_content(tmp_path: Path):
+    md = tmp_path / "vocab.md"
+    md.write_text("## Vokabular\nClaude\n## Korrekturen\nCloud -> Claude\n", encoding="utf-8")
+    store = VocabularyStore(md, logging.getLogger("test"))
+    try:
+        assert store.get_prompt() == "Claude"
+        assert store.get_corrections() == {"Cloud": "Claude"}
+    finally:
+        store.stop()
+
+
+def test_store_reloads_on_file_change(tmp_path: Path):
+    md = tmp_path / "vocab.md"
+    md.write_text("## Vokabular\nClaude\n", encoding="utf-8")
+    store = VocabularyStore(md, logging.getLogger("test"))
+    try:
+        assert store.get_prompt() == "Claude"
+        md.write_text("## Vokabular\nAnthropic, Ollama\n", encoding="utf-8")
+        assert _wait_for(lambda: set(store.get_prompt().split(", ")) == {"Anthropic", "Ollama"}), \
+            f"Store did not reload; got {store.get_prompt()!r}"
+    finally:
+        store.stop()
+
+
+def test_store_handles_missing_file_then_created(tmp_path: Path):
+    md = tmp_path / "vocab.md"
+    # Note: file doesn't exist yet
+    store = VocabularyStore(md, logging.getLogger("test"))
+    try:
+        assert store.get_prompt() == ""
+        md.write_text("## Vokabular\nClaude\n", encoding="utf-8")
+        assert _wait_for(lambda: store.get_prompt() == "Claude"), \
+            f"Store did not pick up created file; got {store.get_prompt()!r}"
+    finally:
+        store.stop()
+
+
+def test_store_get_corrections_returns_copy(tmp_path: Path):
+    md = tmp_path / "vocab.md"
+    md.write_text("## Korrekturen\nCloud -> Claude\n", encoding="utf-8")
+    store = VocabularyStore(md, logging.getLogger("test"))
+    try:
+        corrections = store.get_corrections()
+        corrections["MUTATED"] = "NOPE"
+        # Internal state must be unaffected
+        assert store.get_corrections() == {"Cloud": "Claude"}
+    finally:
+        store.stop()
