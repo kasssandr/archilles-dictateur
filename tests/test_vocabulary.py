@@ -70,6 +70,32 @@ def test_ignores_comments_and_blank_lines(tmp_path: Path, logger):
     assert corrections == {"Cloud": "Claude"}
 
 
+def test_english_headers_supported(tmp_path: Path, logger):
+    md = tmp_path / "vocab.md"
+    md.write_text(
+        "## Vocabulary\n"
+        "Kubernetes, PostgreSQL\n"
+        "## Corrections\n"
+        "cashing -> caching\n",
+        encoding="utf-8",
+    )
+    prompt, corrections = parse_vocabulary_file(md, logger)
+    assert set(prompt.split(", ")) == {"Kubernetes", "PostgreSQL"}
+    assert corrections == {"cashing": "caching"}
+
+
+def test_mixed_de_en_headers(tmp_path: Path, logger):
+    md = tmp_path / "vocab.md"
+    md.write_text(
+        "## Vocabulary\nKubernetes\n"
+        "## Korrekturen\ncashing -> caching\n",
+        encoding="utf-8",
+    )
+    prompt, corrections = parse_vocabulary_file(md, logger)
+    assert prompt == "Kubernetes"
+    assert corrections == {"cashing": "caching"}
+
+
 def test_header_case_insensitive(tmp_path: Path, logger):
     md = tmp_path / "vocab.md"
     md.write_text(

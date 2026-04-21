@@ -30,8 +30,11 @@ def parse_vocabulary_file(path: Path, logger: logging.Logger) -> tuple[str, dict
     content = _COMMENT_RE.sub("", content)
     sections = _split_sections(content)
 
-    vocab_raw = sections.get("vokabular", "")
-    corr_raw = sections.get("korrekturen", "")
+    # Accept English and German section headers interchangeably so the
+    # English-language README stays truthful without breaking existing
+    # German vocabulary files.
+    vocab_raw = sections.get("vocabulary", sections.get("vokabular", ""))
+    corr_raw = sections.get("corrections", sections.get("korrekturen", ""))
 
     prompt = _parse_vocabulary(vocab_raw, logger)
     corrections = _parse_corrections(corr_raw, logger)

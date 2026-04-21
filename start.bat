@@ -4,7 +4,9 @@ REM Starts Python daemon and AHK hotkey script
 
 cd /d "%~dp0"
 
-set ARCHILLES_VOCABULARY_PATH=D:\Archilles-Lab\Dictator\Vokabular.md
+REM Optional: point the daemon at a custom-vocabulary markdown file.
+REM See README.md → "Custom vocabulary" for the expected format.
+REM set ARCHILLES_VOCABULARY_PATH=%USERPROFILE%\Documents\archilles-dictator\vocabulary.md
 
 REM Start daemon in background (expliziter venv-Pfad)
 start /B "" "%~dp0venv\Scripts\python.exe" "%~dp0daemon.py"
