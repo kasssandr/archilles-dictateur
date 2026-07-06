@@ -8,6 +8,11 @@ REM Optional: point the daemon at a custom-vocabulary markdown file.
 REM See README.md → "Custom vocabulary" for the expected format.
 REM set ARCHILLES_VOCABULARY_PATH=%USERPROFILE%\Documents\archilles-dictator\vocabulary.md
 
+REM Optional: override the Whisper model (default: small / float16).
+REM Larger model = better recognition, more VRAM (~2 GB for large-v3-turbo int8_float16).
+REM set ARCHILLES_MODEL_SIZE=large-v3-turbo
+REM set ARCHILLES_COMPUTE_TYPE=int8_float16
+
 REM Start daemon in background (expliziter venv-Pfad)
 start /B "" "%~dp0venv\Scripts\python.exe" "%~dp0daemon.py"
 

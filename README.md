@@ -88,13 +88,15 @@ The daemon logs to `%APPDATA%\archilles-dictator\daemon.log` (rotated at 1 MB, o
 | `device`       | `cuda`      | Auto-falls-back to `cpu` on failure.         |
 | `compute_type` | `float16`   | Uses `int8` on CPU fallback.                 |
 
-The only runtime knob currently read from the environment is the vocabulary file:
+Three runtime knobs are read from the environment:
 
 ```
 ARCHILLES_VOCABULARY_PATH=C:\path\to\your\Vokabular.md
+ARCHILLES_MODEL_SIZE=large-v3-turbo
+ARCHILLES_COMPUTE_TYPE=int8_float16
 ```
 
-Set it in `start.bat` (see the existing line) or your shell before launching the daemon. If unset, the vocabulary store remains empty and transcription works without customization.
+Set them in `start.bat` (see the existing lines) or your shell before launching the daemon. If unset, the vocabulary store remains empty (transcription works without customization) and the model defaults from `DaemonConfig` apply. `ARCHILLES_MODEL_SIZE` / `ARCHILLES_COMPUTE_TYPE` make it easy to trade VRAM for accuracy without editing code — e.g. `large-v3-turbo` with `int8_float16` fits in ~2 GB and transcribes German noticeably better than `small`.
 
 ## Custom vocabulary
 

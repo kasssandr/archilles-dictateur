@@ -138,9 +138,18 @@ SocketClose(s) {
         if SubStr(response, 1, 7) = "RESULT:" {
             text := SubStr(response, 8)
             if text != "" {
+                ; Save clipboard, paste transcription, restore clipboard —
+                ; dictation must not clobber whatever the user had copied.
+                clipSaved := ClipboardAll()
                 A_Clipboard := text
-                Sleep(50)
-                SendInput("^v")
+                if ClipWait(1) {
+                    SendInput("^v")
+                    ; Give the target app time to process the paste before
+                    ; the original clipboard content comes back.
+                    Sleep(500)
+                }
+                A_Clipboard := clipSaved
+                clipSaved := ""
             }
         } else if SubStr(response, 1, 6) = "ERROR:" {
             ToolTip("❌ " . SubStr(response, 7))

@@ -56,7 +56,7 @@ def setup_logging() -> logging.Logger:
     logger = logging.getLogger("archilles")
     logger.setLevel(logging.INFO)
 
-    handler = RotatingFileHandler(log_file, maxBytes=1_000_000, backupCount=1)
+    handler = RotatingFileHandler(log_file, maxBytes=1_000_000, backupCount=1, encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     logger.addHandler(handler)
 
@@ -118,7 +118,14 @@ class TranscriptionService:
         kwargs = {"language": language}
         if initial_prompt:
             kwargs["initial_prompt"] = initial_prompt
-        segments, _ = self.model.transcribe(audio, **kwargs)
+        # vad_filter strips silence; condition_on_previous_text=False prevents
+        # the repetition loops Whisper falls into on pauses in the audio.
+        segments, _ = self.model.transcribe(
+            audio,
+            vad_filter=True,
+            condition_on_previous_text=False,
+            **kwargs,
+        )
         return "".join(seg.text for seg in segments).strip()
 
 
@@ -246,6 +253,10 @@ def main():
     vocab_env = os.environ.get("ARCHILLES_VOCABULARY_PATH")
     vocabulary_path = Path(vocab_env) if vocab_env else None
     config = DaemonConfig(vocabulary_path=vocabulary_path)
+    if model_size := os.environ.get("ARCHILLES_MODEL_SIZE"):
+        config.model_size = model_size
+    if compute_type := os.environ.get("ARCHILLES_COMPUTE_TYPE"):
+        config.compute_type = compute_type
     server = DaemonServer(config)
 
     def signal_handler(sig, frame):
