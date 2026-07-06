@@ -21,7 +21,7 @@ archilles-dictateur/
 ├── vocabulary.py         # NEW: VocabularyStore (parsing + file-watching)
 ├── post_processor.py     # NEW: apply_corrections function
 ├── daemon.py             # MODIFIED: wire VocabularyStore, pass initial_prompt, apply corrections
-├── start.bat             # MODIFIED: set ARCHILLES_VOCABULARY_PATH env var
+├── start.bat             # MODIFIED: set DICTATEUR_VOCABULARY_PATH env var
 ├── requirements.txt      # MODIFIED: add watchdog
 └── tests/
     ├── test_vocabulary.py      # NEW
@@ -753,13 +753,13 @@ In `DaemonServer.shutdown`, add after stopping the recorder:
 self.vocabulary.stop()
 ```
 
-- [ ] **Step 4: Read `ARCHILLES_VOCABULARY_PATH` in `main()`**
+- [ ] **Step 4: Read `DICTATEUR_VOCABULARY_PATH` in `main()`**
 
 At the top of `daemon.py`, add `import os` if not present. Change `main()`:
 
 ```python
 def main():
-    vocab_env = os.environ.get("ARCHILLES_VOCABULARY_PATH")
+    vocab_env = os.environ.get("DICTATEUR_VOCABULARY_PATH")
     vocabulary_path = Path(vocab_env) if vocab_env else None
     config = DaemonConfig(vocabulary_path=vocabulary_path)
     server = DaemonServer(config)
@@ -798,7 +798,7 @@ If `tests/test_daemon.py` needed adjustment: include it in the same commit.
 
 ---
 
-## Task 6: Set `ARCHILLES_VOCABULARY_PATH` in start.bat
+## Task 6: Set `DICTATEUR_VOCABULARY_PATH` in start.bat
 
 **Files:**
 - Modify: `start.bat`
@@ -808,7 +808,7 @@ If `tests/test_daemon.py` needed adjustment: include it in the same commit.
 Insert this line after the `cd /d "%~dp0"` line and before the `start /B` line:
 
 ```batch
-set ARCHILLES_VOCABULARY_PATH=D:\Archilles-Lab\Dictateur\Vokabular.md
+set DICTATEUR_VOCABULARY_PATH=D:\Archilles-Lab\Dictateur\Vokabular.md
 ```
 
 Resulting relevant section:
@@ -816,7 +816,7 @@ Resulting relevant section:
 ```batch
 cd /d "%~dp0"
 
-set ARCHILLES_VOCABULARY_PATH=D:\Archilles-Lab\Dictateur\Vokabular.md
+set DICTATEUR_VOCABULARY_PATH=D:\Archilles-Lab\Dictateur\Vokabular.md
 
 REM Start daemon in background (expliziter venv-Pfad)
 start /B "" "%~dp0venv\Scripts\python.exe" "%~dp0daemon.py"
@@ -826,7 +826,7 @@ start /B "" "%~dp0venv\Scripts\python.exe" "%~dp0daemon.py"
 
 ```bash
 git add start.bat
-git commit -m "chore: set ARCHILLES_VOCABULARY_PATH in start.bat"
+git commit -m "chore: set DICTATEUR_VOCABULARY_PATH in start.bat"
 ```
 
 ---

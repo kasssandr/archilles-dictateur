@@ -91,16 +91,16 @@ The daemon logs to `%APPDATA%\archilles-dictateur\daemon.log` (rotated at 1 MB, 
 Three runtime knobs are read from the environment:
 
 ```
-ARCHILLES_VOCABULARY_PATH=C:\path\to\your\Vokabular.md
-ARCHILLES_MODEL_SIZE=large-v3-turbo
-ARCHILLES_COMPUTE_TYPE=int8_float16
+DICTATEUR_VOCABULARY_PATH=C:\path\to\your\Vokabular.md
+DICTATEUR_MODEL_SIZE=large-v3-turbo
+DICTATEUR_COMPUTE_TYPE=int8_float16
 ```
 
-Set them in `start.bat` (see the existing lines) or your shell before launching the daemon. If unset, the vocabulary store remains empty (transcription works without customization) and the model defaults from `DaemonConfig` apply. `ARCHILLES_MODEL_SIZE` / `ARCHILLES_COMPUTE_TYPE` make it easy to trade VRAM for accuracy without editing code — e.g. `large-v3-turbo` with `int8_float16` fits in ~2 GB and transcribes German noticeably better than `small`.
+Set them in `start.bat` (see the existing lines) or your shell before launching the daemon. If unset, the vocabulary store remains empty (transcription works without customization) and the model defaults from `DaemonConfig` apply. `DICTATEUR_MODEL_SIZE` / `DICTATEUR_COMPUTE_TYPE` make it easy to trade VRAM for accuracy without editing code — e.g. `large-v3-turbo` with `int8_float16` fits in ~2 GB and transcribes German noticeably better than `small`.
 
 ## Custom vocabulary
 
-Point `ARCHILLES_VOCABULARY_PATH` at a Markdown file with two H2 sections:
+Point `DICTATEUR_VOCABULARY_PATH` at a Markdown file with two H2 sections:
 
 ```markdown
 # My Vocabulary

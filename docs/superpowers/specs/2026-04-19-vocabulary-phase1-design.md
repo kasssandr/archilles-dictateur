@@ -141,7 +141,7 @@ def apply_corrections(text: str, corrections: dict[str, str]) -> str:
 ```python
 vocabulary_path: Path | None = None
 ```
-Wird in `main()` aus `os.environ.get("ARCHILLES_VOCABULARY_PATH")` gesetzt (None, wenn nicht gesetzt).
+Wird in `main()` aus `os.environ.get("DICTATEUR_VOCABULARY_PATH")` gesetzt (None, wenn nicht gesetzt).
 
 **`DaemonServer`** — hält `self.vocabulary = VocabularyStore(config.vocabulary_path, self.logger)`.
 
@@ -166,7 +166,7 @@ send_message(stream, f"RESULT:{text}")
 
 Die ENV-Variable wird explizit gesetzt:
 ```batch
-set ARCHILLES_VOCABULARY_PATH=D:\Archilles-Lab\Dictateur\Vokabular.md
+set DICTATEUR_VOCABULARY_PATH=D:\Archilles-Lab\Dictateur\Vokabular.md
 ```
 
 Platziert vor dem `start /B ... python.exe ...` Aufruf.
@@ -194,14 +194,14 @@ Bestehende `tests/test_daemon.py` bleibt. Keine Integration-Tests gegen echtes W
 
 ## Konfiguration
 
-- **`ARCHILLES_VOCABULARY_PATH`** (ENV): Absolutpfad zur Markdown-Datei. Default: nicht gesetzt → Store bleibt leer, Daemon funktioniert wie bisher (graceful degradation).
+- **`DICTATEUR_VOCABULARY_PATH`** (ENV): Absolutpfad zur Markdown-Datei. Default: nicht gesetzt → Store bleibt leer, Daemon funktioniert wie bisher (graceful degradation).
 - Kein Auto-Discovery des Obsidian-Pfads — explizit in `start.bat`.
 
 ## Fehlerbehandlung
 
 | Szenario | Verhalten |
 |---|---|
-| `ARCHILLES_VOCABULARY_PATH` nicht gesetzt | Store leer, Daemon läuft unverändert, INFO-Log |
+| `DICTATEUR_VOCABULARY_PATH` nicht gesetzt | Store leer, Daemon läuft unverändert, INFO-Log |
 | Pfad gesetzt, aber Datei existiert nicht | Store leer, WARNING-Log, File-Watcher wartet auf Datei-Erstellung |
 | Datei unlesbar (Permissions) | Store leer, ERROR-Log, Retry beim nächsten Änderungs-Event |
 | Parsing-Fehler einer Zeile | Zeile übersprungen, WARNING-Log mit Zeilennummer |

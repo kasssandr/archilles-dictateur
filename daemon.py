@@ -250,12 +250,12 @@ class DaemonServer:
 
 
 def main():
-    vocab_env = os.environ.get("ARCHILLES_VOCABULARY_PATH")
+    vocab_env = os.environ.get("DICTATEUR_VOCABULARY_PATH")
     vocabulary_path = Path(vocab_env) if vocab_env else None
     config = DaemonConfig(vocabulary_path=vocabulary_path)
-    if model_size := os.environ.get("ARCHILLES_MODEL_SIZE"):
+    if model_size := os.environ.get("DICTATEUR_MODEL_SIZE"):
         config.model_size = model_size
-    if compute_type := os.environ.get("ARCHILLES_COMPUTE_TYPE"):
+    if compute_type := os.environ.get("DICTATEUR_COMPUTE_TYPE"):
         config.compute_type = compute_type
     server = DaemonServer(config)
 
