@@ -1,12 +1,12 @@
 @echo off
-REM Archilles Dictator — Start Script
+REM Dictateur — Start Script
 REM Starts Python daemon and AHK hotkey script
 
 cd /d "%~dp0"
 
 REM Optional: point the daemon at a custom-vocabulary markdown file.
 REM See README.md → "Custom vocabulary" for the expected format.
-REM set ARCHILLES_VOCABULARY_PATH=%USERPROFILE%\Documents\archilles-dictator\vocabulary.md
+REM set ARCHILLES_VOCABULARY_PATH=%USERPROFILE%\Documents\archilles-dictateur\vocabulary.md
 
 REM Optional: override the Whisper model (default: small / float16).
 REM Larger model = better recognition, more VRAM (~2 GB for large-v3-turbo int8_float16).
@@ -34,4 +34,4 @@ REM Start AHK script (GUI process, no console window)
 set AHK="%LOCALAPPDATA%\Programs\AutoHotkey\v2\AutoHotkey64.exe"
 start "" %AHK% "%~dp0hotkey.ahk"
 
-echo Archilles Dictator running.
+echo Dictateur running.

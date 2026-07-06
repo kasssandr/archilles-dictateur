@@ -2,7 +2,7 @@
 
 ## Zusammenfassung
 
-Erweiterung des Archilles Dictator um ein manuell gepflegtes Fachbegriffs-/Korrekturen-Wörterbuch. Die Datei liegt im Obsidian-Vault des Nutzers (`D:\Archilles-Lab\Dictator\Vokabular.md`) und wird vom Daemon automatisch beim Start und bei jeder Dateiänderung eingelesen. Zweck: Whisper erkennt Fachbegriffe wie „Claude", „Anthropic" oder „Merovinger" zuverlässiger, und systematische Fehltranskriptionen werden im Nachgang automatisch korrigiert.
+Erweiterung des Archilles Dictateur um ein manuell gepflegtes Fachbegriffs-/Korrekturen-Wörterbuch. Die Datei liegt im Obsidian-Vault des Nutzers (`D:\Archilles-Lab\Dictateur\Vokabular.md`) und wird vom Daemon automatisch beim Start und bei jeder Dateiänderung eingelesen. Zweck: Whisper erkennt Fachbegriffe wie „Claude", „Anthropic" oder „Merovinger" zuverlässiger, und systematische Fehltranskriptionen werden im Nachgang automatisch korrigiert.
 
 Phase 1 ist bewusst minimal: keine Automatik, kein LLM, kein Lern-Hotkey. Die Vokabular-Datei wird manuell in Obsidian gepflegt. Phase 2 (LLM-Polish via Ollama) wird separat designt und ergänzt die Pipeline, ohne Phase 1 abzulösen.
 
@@ -24,7 +24,7 @@ Phase 1 ist bewusst minimal: keine Automatik, kein LLM, kein Lern-Hotkey. Die Vo
 ```
 ┌────────────────────────────┐
 │ Obsidian Vault             │
-│ D:\Archilles-Lab\Dictator\ │  ← Nutzer editiert manuell
+│ D:\Archilles-Lab\Dictateur\ │  ← Nutzer editiert manuell
 │  Vokabular.md              │
 └────────────┬───────────────┘
              │ (watchdog File-Watch)
@@ -57,21 +57,21 @@ Keine Änderungen am TCP-Protokoll, keine Änderungen am AHK-Client.
 
 ## Komponenten
 
-### 1. Vokabular-Datei (`D:\Archilles-Lab\Dictator\Vokabular.md`)
+### 1. Vokabular-Datei (`D:\Archilles-Lab\Dictateur\Vokabular.md`)
 
 Markdown-Datei mit zwei Abschnitten. Wird vom Nutzer in Obsidian gepflegt.
 
 **Format:**
 
 ```markdown
-# Archilles Dictator Vokabular
+# Archilles Dictateur Vokabular
 
 Diese Datei wird automatisch vom Daemon gelesen.
 Änderungen werden sofort wirksam (Hot-Reload).
 
 ## Vokabular
 <!-- Kommagetrennt oder zeilenweise. Geht als initial_prompt an Whisper. -->
-Claude, Anthropic, Archilles, Dictator, faster-whisper
+Claude, Anthropic, Archilles, Dictateur, faster-whisper
 Antigravity, Obsidian, Merovinger, merowingisch, Meroweg
 TypeScript, Python, Ollama, Gemma
 
@@ -80,7 +80,7 @@ TypeScript, Python, Ollama, Gemma
 Cloud -> Claude
 Clod -> Claude
 Klod -> Claude
-Diktator -> Dictator
+Diktator -> Dictateur
 ```
 
 **Parsing-Regeln:**
@@ -166,14 +166,14 @@ send_message(stream, f"RESULT:{text}")
 
 Die ENV-Variable wird explizit gesetzt:
 ```batch
-set ARCHILLES_VOCABULARY_PATH=D:\Archilles-Lab\Dictator\Vokabular.md
+set ARCHILLES_VOCABULARY_PATH=D:\Archilles-Lab\Dictateur\Vokabular.md
 ```
 
 Platziert vor dem `start /B ... python.exe ...` Aufruf.
 
 ### 6. Initiale Vokabular-Datei
 
-Eine minimale erste Version der Datei wird im Zuge der Umsetzung angelegt (unter `D:\Archilles-Lab\Dictator\Vokabular.md`), damit der Daemon beim ersten Start nicht eine fehlende Datei sieht. Inhalt: die Begriffe, die aus bisheriger Erfahrung problematisch sind (Claude, Anthropic, Archilles, Dictator, Antigravity, Obsidian) und die aus dieser Session bekannten Korrekturen (Cloud→Claude, Klod→Claude).
+Eine minimale erste Version der Datei wird im Zuge der Umsetzung angelegt (unter `D:\Archilles-Lab\Dictateur\Vokabular.md`), damit der Daemon beim ersten Start nicht eine fehlende Datei sieht. Inhalt: die Begriffe, die aus bisheriger Erfahrung problematisch sind (Claude, Anthropic, Archilles, Dictateur, Antigravity, Obsidian) und die aus dieser Session bekannten Korrekturen (Cloud→Claude, Klod→Claude).
 
 ## Tests
 

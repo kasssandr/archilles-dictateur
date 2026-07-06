@@ -1,8 +1,8 @@
-# Archilles Dictator
+# Dictateur
 
 System-wide, offline push-to-talk dictation for Windows. Hold a hotkey, speak, release — your words appear in whatever text field has focus. Transcription runs locally via [faster-whisper](https://github.com/SYSTRAN/faster-whisper); no audio leaves your machine.
 
-Archilles Dictator is the dictation front-end of the **Archilles** toolchain — a small family of local-first language tools. Its sibling, the [Archillator](https://archilles.org/archillator/), cleans, corrects, and translates long-form text. Dictator handles the input side: getting words from voice into any application (IDE, browser, chat, editor) without switching contexts.
+Dictateur is the dictation front-end of the **Archilles** toolchain — a small family of local-first language tools. Its sibling, the [Archillator](https://archilles.org/archillator/), cleans, corrects, and translates long-form text. Dictateur handles the input side: getting words from voice into any application (IDE, browser, chat, editor) without switching contexts.
 
 ## Features
 
@@ -10,7 +10,7 @@ Archilles Dictator is the dictation front-end of the **Archilles** toolchain —
 - **Fully local.** Audio is recorded, transcribed, and discarded on your machine. No cloud APIs.
 - **GPU-accelerated with CPU fallback.** Uses CUDA + `float16` when available; falls back transparently to CPU `int8`.
 - **Custom vocabulary, hot-reloaded.** Point the daemon at a Markdown file; it feeds domain terms to Whisper as an `initial_prompt` and applies deterministic find/replace corrections post-transcription. Edit the file in any editor — changes take effect immediately.
-- **Works in any app.** Because results are pasted via the clipboard, Dictator works in VS Code, browsers, Word, Obsidian, Claude Code terminals — anything that accepts paste.
+- **Works in any app.** Because results are pasted via the clipboard, Dictateur works in VS Code, browsers, Word, Obsidian, Claude Code terminals — anything that accepts paste.
 - **No GUI.** A background Python daemon plus an AutoHotkey v2 script. Start and forget.
 
 ## Architecture
@@ -39,8 +39,8 @@ The protocol is a minimal length-prefixed text framing (`protocol.py`). The daem
 ## Installation
 
 ```bat
-git clone https://github.com/kasssandr/archilles-dictator.git
-cd archilles-dictator
+git clone https://github.com/kasssandr/archilles-dictateur.git
+cd archilles-dictateur
 
 python -m venv venv
 venv\Scripts\pip install -r requirements.txt
@@ -56,7 +56,7 @@ On first run, faster-whisper downloads the Whisper `small` model (~500 MB) into 
 start.bat
 ```
 
-`start.bat` launches the daemon, waits until port `9876` is listening, then starts the AHK script. A brief tooltip (`Dictator: Verbunden`) confirms the connection.
+`start.bat` launches the daemon, waits until port `9876` is listening, then starts the AHK script. A brief tooltip (`Dictateur: Verbunden`) confirms the connection.
 
 ### Dictate
 
@@ -73,7 +73,7 @@ stop.bat
 
 ### Logs
 
-The daemon logs to `%APPDATA%\archilles-dictator\daemon.log` (rotated at 1 MB, one backup kept).
+The daemon logs to `%APPDATA%\archilles-dictateur\daemon.log` (rotated at 1 MB, one backup kept).
 
 ## Configuration
 
@@ -147,10 +147,10 @@ docs/              Design specs and implementation plans
 
 ## Troubleshooting
 
-- **Tooltip says "Verbindung verloren" or never connects.** The daemon didn't start or crashed. Check `%APPDATA%\archilles-dictator\daemon.log`.
+- **Tooltip says "Verbindung verloren" or never connects.** The daemon didn't start or crashed. Check `%APPDATA%\archilles-dictateur\daemon.log`.
 - **"Port 9876 already in use".** Another daemon is still running. Run `stop.bat`, or find and kill the lingering `python` process.
 - **"CUDA not available, falling back to CPU".** The daemon could not load Whisper on GPU. Check `nvidia-smi`, verify your CUDA runtime, and confirm the `nvidia-*` DLLs installed by `pip` are in `venv\Lib\site-packages\nvidia\*\bin`. CPU fallback is fine, just slower.
-- **Nothing gets pasted.** The target application may filter `Ctrl+V`. Some terminals require a different paste shortcut; Dictator currently only sends `Ctrl+V`.
+- **Nothing gets pasted.** The target application may filter `Ctrl+V`. Some terminals require a different paste shortcut; Dictateur currently only sends `Ctrl+V`.
 
 ## Known limitations
 

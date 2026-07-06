@@ -1,4 +1,4 @@
-; hotkey.ahk — Archilles Dictator AHK v2 Client
+; hotkey.ahk — Dictateur AHK v2 Client
 ; Ctrl+Win hold = record, release = stop + transcribe + paste
 #Requires AutoHotkey v2.0
 #SingleInstance Force
@@ -21,7 +21,7 @@ Connect() {
         sock := SocketCreate()
         SocketConnect(sock, HOST, PORT)
         isConnected := true
-        ToolTip("Dictator: Verbunden")
+        ToolTip("Dictateur: Verbunden")
         SetTimer(() => ToolTip(), -2000)
     } catch {
         isConnected := false

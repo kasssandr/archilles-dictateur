@@ -169,14 +169,14 @@ def test_vocabulary_preserves_phrases(tmp_path: Path, logger):
     md.write_text(
         "## Vokabular\n"
         "Claude Code, fasse Kapitel zusammen\n"
-        "Archilles Dictator\n",
+        "Archilles Dictateur\n",
         encoding="utf-8",
     )
     prompt, corrections = parse_vocabulary_file(md, logger)
     tokens = prompt.split(", ")
     assert "Claude Code" in tokens
     assert "fasse Kapitel zusammen" in tokens
-    assert "Archilles Dictator" in tokens
+    assert "Archilles Dictateur" in tokens
 
 
 def test_vocabulary_too_long_is_truncated(tmp_path: Path, logger, caplog):

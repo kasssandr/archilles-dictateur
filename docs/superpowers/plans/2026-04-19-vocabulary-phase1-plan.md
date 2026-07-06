@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Write tests first, make them fail, then implement to make them pass.
 
-**Goal:** Add a user-maintained vocabulary and corrections dictionary to the Archilles Dictator daemon. The vocabulary file lives in the user's Obsidian vault, is parsed at daemon startup and on every file change, and feeds Whisper's `initial_prompt` plus a post-processing find/replace step.
+**Goal:** Add a user-maintained vocabulary and corrections dictionary to the Archilles Dictateur daemon. The vocabulary file lives in the user's Obsidian vault, is parsed at daemon startup and on every file change, and feeds Whisper's `initial_prompt` plus a post-processing find/replace step.
 
 **Architecture:** A new `VocabularyStore` class (in `vocabulary.py`) owns the file-watching and parsing. A new `apply_corrections` function (in `post_processor.py`) handles the post-processing step. The existing daemon is modified to wire these into the STOP handler, between transcription and sending the result. No protocol changes, no AHK changes.
 
@@ -10,14 +10,14 @@
 
 **Spec:** `docs/superpowers/specs/2026-04-19-vocabulary-phase1-design.md`
 
-**Vocabulary file location:** `D:\Archilles-Lab\Dictator\Vokabular.md` (user's Obsidian vault)
+**Vocabulary file location:** `D:\Archilles-Lab\Dictateur\Vokabular.md` (user's Obsidian vault)
 
 ---
 
 ## File Changes Overview
 
 ```
-archilles-dictator/
+archilles-dictateur/
 ├── vocabulary.py         # NEW: VocabularyStore (parsing + file-watching)
 ├── post_processor.py     # NEW: apply_corrections function
 ├── daemon.py             # MODIFIED: wire VocabularyStore, pass initial_prompt, apply corrections
@@ -31,7 +31,7 @@ archilles-dictator/
 
 User-side (outside repo):
 ```
-D:\Archilles-Lab\Dictator\Vokabular.md   # NEW: initial vocabulary file
+D:\Archilles-Lab\Dictateur\Vokabular.md   # NEW: initial vocabulary file
 ```
 
 ---
@@ -55,7 +55,7 @@ watchdog
 
 - [ ] **Step 2: Install into existing venv**
 
-Run (from project root, `C:\Users\tomra\archilles-dictator`):
+Run (from project root, `C:\Users\tomra\archilles-dictateur`):
 ```bash
 ./venv/Scripts/pip install watchdog
 ```
@@ -808,7 +808,7 @@ If `tests/test_daemon.py` needed adjustment: include it in the same commit.
 Insert this line after the `cd /d "%~dp0"` line and before the `start /B` line:
 
 ```batch
-set ARCHILLES_VOCABULARY_PATH=D:\Archilles-Lab\Dictator\Vokabular.md
+set ARCHILLES_VOCABULARY_PATH=D:\Archilles-Lab\Dictateur\Vokabular.md
 ```
 
 Resulting relevant section:
@@ -816,7 +816,7 @@ Resulting relevant section:
 ```batch
 cd /d "%~dp0"
 
-set ARCHILLES_VOCABULARY_PATH=D:\Archilles-Lab\Dictator\Vokabular.md
+set ARCHILLES_VOCABULARY_PATH=D:\Archilles-Lab\Dictateur\Vokabular.md
 
 REM Start daemon in background (expliziter venv-Pfad)
 start /B "" "%~dp0venv\Scripts\python.exe" "%~dp0daemon.py"
@@ -834,24 +834,24 @@ git commit -m "chore: set ARCHILLES_VOCABULARY_PATH in start.bat"
 ## Task 7: Create initial vocabulary file in Obsidian vault
 
 **Files:**
-- Create: `D:\Archilles-Lab\Dictator\Vokabular.md` (outside repo — on the user's D: drive)
+- Create: `D:\Archilles-Lab\Dictateur\Vokabular.md` (outside repo — on the user's D: drive)
 
 - [ ] **Step 1: Ensure the directory exists**
 
 Run:
 ```bash
-mkdir -p "/d/Archilles-Lab/Dictator"
+mkdir -p "/d/Archilles-Lab/Dictateur"
 ```
-(Or from PowerShell: `New-Item -ItemType Directory -Force -Path "D:\Archilles-Lab\Dictator"`)
+(Or from PowerShell: `New-Item -ItemType Directory -Force -Path "D:\Archilles-Lab\Dictateur"`)
 
 If `D:\Archilles-Lab` does not exist, stop and ask the user — do not create the vault root.
 
 - [ ] **Step 2: Write initial content**
 
-Create `D:\Archilles-Lab\Dictator\Vokabular.md` with:
+Create `D:\Archilles-Lab\Dictateur\Vokabular.md` with:
 
 ```markdown
-# Archilles Dictator Vokabular
+# Archilles Dictateur Vokabular
 
 Diese Datei wird automatisch vom Daemon gelesen.
 Änderungen werden sofort wirksam (Hot-Reload, kein Neustart nötig).
@@ -859,7 +859,7 @@ Diese Datei wird automatisch vom Daemon gelesen.
 ## Vokabular
 <!-- Kommagetrennt oder zeilenweise. Geht als initial_prompt an Whisper. -->
 <!-- Grenze: ca. 150 Wörter. Längere Listen werden automatisch gekürzt. -->
-Claude, Anthropic, Archilles, Dictator, faster-whisper
+Claude, Anthropic, Archilles, Dictateur, faster-whisper
 Antigravity, Obsidian, Ollama, Gemma
 TypeScript, Python, AutoHotkey
 
@@ -868,13 +868,13 @@ TypeScript, Python, AutoHotkey
 Cloud -> Claude
 Clod -> Claude
 Klod -> Claude
-Diktator -> Dictator
+Diktator -> Dictateur
 ```
 
 - [ ] **Step 3: Verify the file is readable**
 
 ```bash
-./venv/Scripts/python -c "from pathlib import Path; print(Path('D:/Archilles-Lab/Dictator/Vokabular.md').read_text(encoding='utf-8')[:200])"
+./venv/Scripts/python -c "from pathlib import Path; print(Path('D:/Archilles-Lab/Dictateur/Vokabular.md').read_text(encoding='utf-8')[:200])"
 ```
 Expected: first 200 characters of the file printed.
 
@@ -896,7 +896,7 @@ Run `start.bat` from the project directory.
 
 - [ ] **Step 3: Check the daemon log**
 
-Open `%APPDATA%/archilles-dictator/daemon.log` and confirm it contains a line like:
+Open `%APPDATA%/archilles-dictateur/daemon.log` and confirm it contains a line like:
 ```
 Vocabulary loaded: N prompt tokens, M corrections
 ```
@@ -922,7 +922,7 @@ Expected: `Ich nutze Claude und Claude.`
 
 - [ ] **Step 6: Hot-reload test**
 
-With the daemon running, open `D:\Archilles-Lab\Dictator\Vokabular.md` in Obsidian. Add a new line to the Korrekturen section:
+With the daemon running, open `D:\Archilles-Lab\Dictateur\Vokabular.md` in Obsidian. Add a new line to the Korrekturen section:
 ```
 Testwort -> Erfolgswort
 ```
@@ -930,7 +930,7 @@ Save. Check the log — you should see a new `Vocabulary loaded: ...` line withi
 
 - [ ] **Step 7: Graceful-degradation test**
 
-Stop daemon/AHK. Temporarily rename `D:\Archilles-Lab\Dictator\Vokabular.md` to `Vokabular.bak`. Restart. Check the log — it should contain a WARNING about the missing file but the daemon should still accept dictation (just without vocabulary). Rename back.
+Stop daemon/AHK. Temporarily rename `D:\Archilles-Lab\Dictateur\Vokabular.md` to `Vokabular.bak`. Restart. Check the log — it should contain a WARNING about the missing file but the daemon should still accept dictation (just without vocabulary). Rename back.
 
 - [ ] **Step 8: Report to user**
 
@@ -939,7 +939,7 @@ Summarize:
 - End-to-end dictation works
 - Hot-reload works
 - Graceful degradation works
-- Vocabulary file lives at `D:\Archilles-Lab\Dictator\Vokabular.md`
+- Vocabulary file lives at `D:\Archilles-Lab\Dictateur\Vokabular.md`
 - User can edit freely in Obsidian; changes take effect within ~1 second
 
 ---
