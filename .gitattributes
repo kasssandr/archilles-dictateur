@@ -1,0 +1,8 @@
+# cmd.exe cannot find batch labels (:wait_loop) in files with LF endings:
+# the script dies mid-run with "batch label not found". Pin CRLF so no editor,
+# tool or checkout can quietly break start.bat / stop.bat again.
+*.bat text eol=crlf
+*.ahk text eol=crlf
+
+*.py text eol=lf
+*.md text eol=lf

@@ -1,20 +1,13 @@
 @echo off
-REM Dictateur — Stop Script
-REM Beendet Daemon und AHK-Script
+REM Dictateur - Stop Script
+REM Stops the Python daemon and the AHK hotkey script.
+REM Matches on the command line, not just the image name, so unrelated
+REM python.exe / AutoHotkey processes are left alone.
 
-REM AHK-Prozess beenden
-taskkill /F /IM AutoHotkey64.exe >nul 2>&1
-taskkill /F /IM AutoHotkey32.exe >nul 2>&1
+cd /d "%~dp0"
 
-REM Daemon beenden (sucht nach python daemon.py)
-for /f "tokens=1" %%p in ('wmic process where "CommandLine like '%%daemon.py%%'" get ProcessId /value 2^>nul ^| findstr ProcessId') do (
-    set PID=%%p
-)
-if defined PID (
-    taskkill /F /PID %PID:~10% >nul 2>&1
-)
+powershell -NoProfile -Command "$p = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -like '*daemon.py*' }; if ($p) { $p | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; Write-Host ('Daemon stopped (PID ' + $_.ProcessId + ')') } } else { Write-Host 'Daemon not running.' }"
 
-REM Alternativ: alle python-Prozesse die daemon.py laufen haben
-powershell -Command "Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*daemon.py*' } | Stop-Process -Force" >nul 2>&1
+powershell -NoProfile -Command "$p = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'AutoHotkey64.exe' -and $_.CommandLine -like '*hotkey.ahk*' }; if ($p) { $p | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; Write-Host ('Hotkey script stopped (PID ' + $_.ProcessId + ')') } } else { Write-Host 'Hotkey script not running.' }"
 
-echo Dictateur gestoppt.
+echo Dictateur stopped.
