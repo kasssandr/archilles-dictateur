@@ -1,14 +1,16 @@
 import numpy as np
 from unittest.mock import MagicMock, patch
-from daemon import AudioRecorder, TranscriptionService, DaemonConfig
+from daemon import AudioRecorder, TranscriptionService, DaemonConfig, DaemonServer
 
 
 def test_config_defaults():
     cfg = DaemonConfig()
-    assert cfg.model_size == "small"
+    assert cfg.model_size == "medium"
+    assert cfg.compute_type == "int8_float16"
     assert cfg.language == "de"
     assert cfg.port == 9876
     assert cfg.sample_rate == 16000
+    assert cfg.idle_unload_minutes == 5.0
 
 
 @patch("daemon.sd.InputStream")
@@ -33,6 +35,31 @@ def test_audio_recorder_stop_without_start_returns_empty():
     recorder = AudioRecorder(sample_rate=16000)
     audio = recorder.stop()
     assert len(audio) == 0
+
+
+@patch("daemon.WhisperModel")
+def test_server_loads_model_on_demand_and_unloads_when_idle(MockModel):
+    server = DaemonServer(DaemonConfig(idle_unload_minutes=5.0))
+    assert server.transcriber is None, "model must not occupy VRAM before first use"
+
+    server._ensure_model()
+    assert server.transcriber is not None
+    MockModel.assert_called_once()
+
+    server._unload_model()
+    assert server.transcriber is None
+
+    # A second dictation reloads it rather than failing.
+    server._ensure_model()
+    assert server.transcriber is not None
+    assert MockModel.call_count == 2
+
+
+@patch("daemon.WhisperModel")
+def test_unload_is_idempotent(MockModel):
+    server = DaemonServer(DaemonConfig())
+    server._unload_model()
+    assert server.transcriber is None
 
 
 def test_transcription_service_returns_string():

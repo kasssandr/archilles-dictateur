@@ -1,3 +1,4 @@
+import gc
 import logging
 import os
 import signal
@@ -5,6 +6,7 @@ import site
 import socket
 import sys
 import threading
+import time
 from dataclasses import dataclass, field
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -36,14 +38,17 @@ from protocol import send_message, recv_message
 
 @dataclass
 class DaemonConfig:
-    model_size: str = "small"
+    model_size: str = "medium"
     language: str = "de"
     port: int = 9876
     host: str = "localhost"
     sample_rate: int = 16000
     device: str = "cuda"
-    compute_type: str = "float16"
+    compute_type: str = "int8_float16"
     vocabulary_path: Path | None = None
+    # Release the model's VRAM after this much idle time, so other GPU
+    # workloads can use it. 0 keeps the model resident for the whole session.
+    idle_unload_minutes: float = 5.0
 
 
 # --- Logging ---
@@ -141,6 +146,10 @@ class DaemonServer:
         self.transcriber = None
         self._server_socket = None
         self._current_conn = None
+        # Guards transcriber against being unloaded mid-transcription.
+        # Reentrant because transcription takes the lock and then calls _ensure_model.
+        self._model_lock = threading.RLock()
+        self._last_used = time.monotonic()
 
     def _load_model(self):
         try:
@@ -158,6 +167,33 @@ class DaemonServer:
                 compute_type="int8",
             )
 
+    def _ensure_model(self):
+        with self._model_lock:
+            if self.transcriber is None:
+                self._load_model()
+            self._last_used = time.monotonic()
+
+    def _unload_model(self):
+        with self._model_lock:
+            if self.transcriber is None:
+                return
+            self.transcriber = None
+            # CTranslate2 frees the GPU allocation when the last reference to the
+            # model drops, but only once the object is actually collected.
+            gc.collect()
+            self.logger.info("Whisper model unloaded after %.0f min idle", self.config.idle_unload_minutes)
+
+    def _idle_watcher(self):
+        timeout = self.config.idle_unload_minutes * 60
+        while self.running:
+            time.sleep(5)
+            if self.recorder.is_recording:
+                continue
+            with self._model_lock:
+                idle_for = time.monotonic() - self._last_used
+                if self.transcriber is not None and idle_for > timeout:
+                    self._unload_model()
+
     def _handle_client(self, conn: socket.socket):
         self.logger.info("Client connected")
         self._current_conn = conn
@@ -173,6 +209,10 @@ class DaemonServer:
                     try:
                         self.recorder.start()
                         self.logger.info("Recording started")
+                        # Reload in the background if the idle watcher unloaded the
+                        # model: it becomes ready while the user is still speaking,
+                        # so the load never shows up as latency.
+                        threading.Thread(target=self._ensure_model, daemon=True).start()
                     except Exception as e:
                         self.logger.error("Mic error: %s", e)
                         send_message(stream, f"ERROR:NO_MIC:{e}")
@@ -187,11 +227,14 @@ class DaemonServer:
 
                     try:
                         prompt = self.vocabulary.get_prompt()
-                        text = self.transcriber.transcribe(
-                            audio,
-                            language=self.config.language,
-                            initial_prompt=prompt,
-                        )
+                        with self._model_lock:
+                            self._ensure_model()
+                            text = self.transcriber.transcribe(
+                                audio,
+                                language=self.config.language,
+                                initial_prompt=prompt,
+                            )
+                            self._last_used = time.monotonic()
                         text = apply_corrections(text, self.vocabulary.get_corrections())
                         self.logger.info("Transcribed: %s", text)
                         send_message(stream, f"RESULT:{text}")
@@ -209,8 +252,14 @@ class DaemonServer:
             self._current_conn = None
 
     def start(self):
-        self._load_model()
         self.running = True
+
+        if self.config.idle_unload_minutes > 0:
+            # Stay out of VRAM until the first dictation actually needs the model.
+            threading.Thread(target=self._idle_watcher, daemon=True).start()
+            self.logger.info("Idle unloading active: %.1f min", self.config.idle_unload_minutes)
+        else:
+            self._ensure_model()
 
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -257,6 +306,11 @@ def main():
         config.model_size = model_size
     if compute_type := os.environ.get("DICTATEUR_COMPUTE_TYPE"):
         config.compute_type = compute_type
+    if idle := os.environ.get("DICTATEUR_IDLE_UNLOAD_MINUTES"):
+        try:
+            config.idle_unload_minutes = float(idle)
+        except ValueError:
+            pass
     server = DaemonServer(config)
 
     def signal_handler(sig, frame):

@@ -8,7 +8,8 @@ Dictateur is the dictation front-end of the **Archilles** toolchain — a small 
 
 - **Push-to-talk, globally.** Hold `Ctrl + Left-Win`, speak, release. Transcribed text is pasted into the active window.
 - **Fully local.** Audio is recorded, transcribed, and discarded on your machine. No cloud APIs.
-- **GPU-accelerated with CPU fallback.** Uses CUDA + `float16` when available; falls back transparently to CPU `int8`.
+- **GPU-accelerated with CPU fallback.** Uses CUDA + `int8_float16` when available; falls back transparently to CPU `int8`.
+- **Gives the GPU back when idle.** After five minutes without dictation the model releases its VRAM, so a local LLM or another GPU job can use it. The next hotkey press reloads it while you are still speaking, so the reload costs no perceptible latency. Tune with `DICTATEUR_IDLE_UNLOAD_MINUTES`.
 - **Custom vocabulary, hot-reloaded.** Point the daemon at a Markdown file; it feeds domain terms to Whisper as an `initial_prompt` and applies deterministic find/replace corrections post-transcription. Edit the file in any editor — changes take effect immediately.
 - **Works in any app.** Because results are pasted via the clipboard, Dictateur works in VS Code, browsers, Word, Obsidian, Claude Code terminals — anything that accepts paste.
 - **No GUI.** A background Python daemon plus an AutoHotkey v2 script. Start and forget.
@@ -33,7 +34,7 @@ The protocol is a minimal length-prefixed text framing (`protocol.py`). The daem
 - **Windows 10/11** (tested on Windows 11).
 - **Python 3.10+**.
 - **[AutoHotkey v2](https://www.autohotkey.com/)** installed at the default location (`%LOCALAPPDATA%\Programs\AutoHotkey\v2\AutoHotkey64.exe`). Adjust `start.bat` if yours lives elsewhere.
-- **NVIDIA GPU with CUDA** recommended (any recent consumer card works; the daemon uses the `small` Whisper model in `float16`). Without CUDA, the daemon automatically falls back to CPU at `int8` — slower but functional.
+- **NVIDIA GPU with CUDA** recommended (any recent consumer card works; the daemon uses the `medium` Whisper model in `int8_float16`, which needs roughly 0.75 GB of VRAM). Without CUDA, the daemon automatically falls back to CPU at `int8` — slower but functional.
 - **A working microphone** reachable through the default Windows audio device.
 
 ## Installation
@@ -46,7 +47,7 @@ python -m venv venv
 venv\Scripts\pip install -r requirements.txt
 ```
 
-On first run, faster-whisper downloads the Whisper `small` model (~500 MB) into its cache.
+On first run, faster-whisper downloads the Whisper `medium` model (~1.5 GB) into its cache.
 
 ## Usage
 
@@ -79,24 +80,38 @@ The daemon logs to `%APPDATA%\archilles-dictateur\daemon.log` (rotated at 1 MB, 
 
 `DaemonConfig` in `daemon.py` exposes the tunables; defaults are:
 
-| Field          | Default     | Notes                                        |
-| -------------- | ----------- | -------------------------------------------- |
-| `model_size`   | `small`     | Any faster-whisper model tag.                |
-| `language`     | `de`        | Whisper language code.                       |
-| `host` / `port`| `localhost:9876` | TCP endpoint the AHK client connects to.|
-| `sample_rate`  | `16000`     | Matches Whisper's expected input.            |
-| `device`       | `cuda`      | Auto-falls-back to `cpu` on failure.         |
-| `compute_type` | `float16`   | Uses `int8` on CPU fallback.                 |
+| Field                 | Default     | Notes                                        |
+| --------------------- | ----------- | -------------------------------------------- |
+| `model_size`          | `medium`    | Any faster-whisper model tag.                |
+| `language`            | `de`        | Whisper language code.                       |
+| `host` / `port`       | `localhost:9876` | TCP endpoint the AHK client connects to.|
+| `sample_rate`         | `16000`     | Matches Whisper's expected input.            |
+| `device`              | `cuda`      | Auto-falls-back to `cpu` on failure.         |
+| `compute_type`        | `int8_float16` | Uses `int8` on CPU fallback.              |
+| `idle_unload_minutes` | `5.0`       | Release VRAM after this idle time; `0` keeps the model resident. |
 
-Three runtime knobs are read from the environment:
+Four runtime knobs are read from the environment:
 
 ```
 DICTATEUR_VOCABULARY_PATH=C:\path\to\your\Vokabular.md
 DICTATEUR_MODEL_SIZE=large-v3-turbo
 DICTATEUR_COMPUTE_TYPE=int8_float16
+DICTATEUR_IDLE_UNLOAD_MINUTES=10
 ```
 
-Set them in `start.bat` (see the existing lines) or your shell before launching the daemon. If unset, the vocabulary store remains empty (transcription works without customization) and the model defaults from `DaemonConfig` apply. `DICTATEUR_MODEL_SIZE` / `DICTATEUR_COMPUTE_TYPE` make it easy to trade VRAM for accuracy without editing code — e.g. `large-v3-turbo` with `int8_float16` fits in ~2 GB and transcribes German noticeably better than `small`.
+Set them in `start.bat` (see the existing lines) or your shell before launching the daemon. If unset, the vocabulary store remains empty (transcription works without customization) and the model defaults from `DaemonConfig` apply.
+
+`DICTATEUR_MODEL_SIZE` / `DICTATEUR_COMPUTE_TYPE` trade VRAM for accuracy without editing code — `large-v3-turbo` with `int8_float16` fits in ~2 GB and transcribes German better still than `medium`, if you have the headroom.
+
+### Idle unloading
+
+The daemon starts without touching the GPU, loads the model on the first dictation, and unloads it again after `idle_unload_minutes` without use. This matters on small cards: on a 4 GB GPU, a resident Whisper model is a quarter of everything you have, and a local LLM will not fit alongside it.
+
+The reload is hidden rather than merely fast: the model starts loading the moment you press the hotkey, in parallel with you speaking, so it is usually ready by the time you release. Loading `medium` takes about 5 seconds, so a dictation that runs longer than that hides the reload completely. Dictate a two-word sentence right after a long pause and you will wait for the remainder — once, until the model unloads again.
+
+If that trade annoys you, raise `DICTATEUR_IDLE_UNLOAD_MINUTES` (fewer unloads, VRAM held longer) or set it to `0`.
+
+Set `DICTATEUR_IDLE_UNLOAD_MINUTES=0` to disable unloading and keep the model resident for the whole session — the old behaviour, and the right choice when the GPU is yours alone.
 
 ## Custom vocabulary
 
