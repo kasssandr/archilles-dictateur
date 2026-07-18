@@ -14,9 +14,9 @@ import re
 #   "open"     — eats the space after it, keeps the one before (opening marks)
 #   "spaced"   — replaces the word only, leaving the surrounding spaces intact
 #
-# The sentence-ending period ("Punkt" / "period") is deliberately absent from
-# both sets: Whisper already sets it from prosody, and the bare word collides
-# with normal speech too often.
+# The sentence-ending period ("Punkt" / "period" / "punto" / "точка") is
+# deliberately absent from every set: Whisper already sets it from prosody, and
+# the bare word collides with normal speech too often.
 _VOICE_COMMANDS: dict[str, list[tuple[str, str, str]]] = {
     "de": [
         # Line breaks and tight joiners — swallow the spaces around them.
@@ -58,6 +58,56 @@ _VOICE_COMMANDS: dict[str, list[tuple[str, str, str]]] = {
         ("open quote", "“", "open"),  # “
         ("quote", "“", "open"),  # “  — pairs with "unquote"
         ("dash", "–", "spaced"),  # –
+    ],
+    # Spanish, Italian and Russian conventionally use guillemets « » for quotes.
+    "es": [
+        ("nuevo párrafo", "\n\n", "collapse"),
+        ("nueva línea", "\n", "collapse"),
+        ("guion", "-", "collapse"),
+        ("guión", "-", "collapse"),  # pre-2010 spelling Whisper may still emit
+        ("barra", "/", "collapse"),
+        ("coma", ",", "left"),
+        ("dos puntos", ":", "left"),
+        ("punto y coma", ";", "left"),
+        ("signo de interrogación", "?", "left"),
+        ("signo de exclamación", "!", "left"),
+        ("cerrar paréntesis", ")", "left"),
+        ("cerrar comillas", "»", "left"),  # »
+        ("abrir paréntesis", "(", "open"),
+        ("abrir comillas", "«", "open"),  # «
+        ("raya", "–", "spaced"),  # –
+    ],
+    "it": [
+        ("nuovo paragrafo", "\n\n", "collapse"),
+        ("nuova riga", "\n", "collapse"),
+        ("trattino", "-", "collapse"),
+        ("barra", "/", "collapse"),
+        ("virgola", ",", "left"),
+        ("due punti", ":", "left"),
+        ("punto e virgola", ";", "left"),
+        ("punto interrogativo", "?", "left"),
+        ("punto esclamativo", "!", "left"),
+        ("chiudi parentesi", ")", "left"),
+        ("chiudi virgolette", "»", "left"),  # »
+        ("apri parentesi", "(", "open"),
+        ("apri virgolette", "«", "open"),  # «
+        ("lineetta", "–", "spaced"),  # –
+    ],
+    "ru": [
+        ("новый абзац", "\n\n", "collapse"),
+        ("новая строка", "\n", "collapse"),
+        ("дефис", "-", "collapse"),
+        ("косая черта", "/", "collapse"),
+        ("запятая", ",", "left"),
+        ("двоеточие", ":", "left"),
+        ("точка с запятой", ";", "left"),
+        ("вопросительный знак", "?", "left"),
+        ("восклицательный знак", "!", "left"),
+        ("закрыть скобку", ")", "left"),
+        ("закрыть кавычки", "»", "left"),  # »
+        ("открыть скобку", "(", "open"),
+        ("открыть кавычки", "«", "open"),  # «
+        ("тире", "–", "spaced"),  # –
     ],
 }
 

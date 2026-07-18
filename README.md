@@ -12,7 +12,7 @@ Dictateur is the dictation front-end of the **Archilles** toolchain — a small 
 - **Gives the GPU back when idle.** After five minutes without dictation the model releases its VRAM, so a local LLM or another GPU job can use it. The next hotkey press reloads it while you are still speaking, so the reload costs no perceptible latency. Tune with `DICTATEUR_IDLE_UNLOAD_MINUTES`.
 - **Custom vocabulary, hot-reloaded.** Point the daemon at a Markdown file; it feeds domain terms to Whisper as an `initial_prompt` and applies deterministic find/replace corrections post-transcription. Edit the file in any editor — changes take effect immediately.
 - **Auto-detects the language.** Speak German or English and each recording is transcribed in the language you actually spoke, not translated. Pin one language with `DICTATEUR_LANGUAGE` if you prefer.
-- **Spoken punctuation, in both languages.** Say `Absatz` / `new paragraph`, `Klammer auf` / `open paren`, `Anführungszeichen zu` / `unquote` and the like; the daemon inserts the symbol locally, using the command set for whichever language you spoke. See [Voice commands](#voice-commands).
+- **Spoken punctuation, per language.** Say `Absatz` / `new paragraph`, `Klammer auf` / `open paren`, `Anführungszeichen zu` / `unquote` and the like; the daemon inserts the symbol locally, using the command set for whichever language you spoke (German, English, Spanish, Italian, Russian). See [Voice commands](#voice-commands).
 - **Works in any app.** Because results are pasted via the clipboard, Dictateur works in VS Code, browsers, Word, Obsidian, Claude Code terminals — anything that accepts paste.
 - **No GUI.** A background Python daemon plus an AutoHotkey v2 script. Start and forget.
 
@@ -164,13 +164,19 @@ switch — the same automatic behaviour as transcription itself.
 | `–` (spaced)   | `Gedankenstrich`                            | `dash`                              |
 | `-` `/`        | `Bindestrich` · `Schrägstrich`              | `hyphen` · `slash`                  |
 
+Spanish (`es`), Italian (`it`) and Russian (`ru`) ship with equivalent sets — e.g.
+`nuevo párrafo` / `nuovo paragrafo` / `новый абзац` for a blank line, and `abrir comillas`
+/ `apri virgolette` / `открыть кавычки` for a quote (these three use guillemets `« »`, the
+convention for those languages). See `_VOICE_COMMANDS` in `post_processor.py` for the full
+lists.
+
 Matching is case-insensitive and word-boundary sensitive, so `Absatz` inside
 `Absatzweise` is left alone. Detection is per word: speak the command as a distinct
 word. Two caveats:
 
 - **Collisions.** If you actually mean the word (\"der wunde Punkt\", \"he gave a
   quote\"), it still gets replaced. That is why the sentence-ending period is excluded
-  from both sets — Whisper already adds it from prosody, and `Punkt` / `period` appear
+  from every set — Whisper already adds it from prosody, and `Punkt` / `period` appear
   too often in normal speech. Add it in `post_processor.py` if you want it.
 - Whisper occasionally mishears a command on very short, mumbled utterances — the same
   trade-off as language auto-detection. Speak whole, clear sentences.

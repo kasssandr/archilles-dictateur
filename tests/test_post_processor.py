@@ -172,3 +172,18 @@ def test_voice_open_mark_swallows_whispers_pause_comma():
     assert apply_voice_commands(text) == "Er sagte „sogenannte Wörter“"
     # Same for opening parens.
     assert apply_voice_commands("Text Klammer auf, Inhalt Klammer zu", "de") == "Text (Inhalt)"
+
+
+def test_voice_spanish_set():
+    text = "Dijo abrir comillas hola mundo cerrar comillas nuevo párrafo Fin coma listo"
+    assert apply_voice_commands(text, "es") == "Dijo «hola mundo»\n\nFin, listo"
+
+
+def test_voice_italian_set():
+    text = "Ha detto apri virgolette ciao mondo chiudi virgolette nuovo paragrafo Fine virgola ok"
+    assert apply_voice_commands(text, "it") == "Ha detto «ciao mondo»\n\nFine, ok"
+
+
+def test_voice_russian_set():
+    text = "Он сказал открыть кавычки привет мир закрыть кавычки новый абзац Конец запятая всё"
+    assert apply_voice_commands(text, "ru") == "Он сказал «привет мир»\n\nКонец, всё"
