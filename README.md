@@ -11,6 +11,7 @@ Dictateur is the dictation front-end of the **Archilles** toolchain — a small 
 - **GPU-accelerated with CPU fallback.** Uses CUDA + `int8_float16` when available; falls back transparently to CPU `int8`.
 - **Gives the GPU back when idle.** After five minutes without dictation the model releases its VRAM, so a local LLM or another GPU job can use it. The next hotkey press reloads it while you are still speaking, so the reload costs no perceptible latency. Tune with `DICTATEUR_IDLE_UNLOAD_MINUTES`.
 - **Custom vocabulary, hot-reloaded.** Point the daemon at a Markdown file; it feeds domain terms to Whisper as an `initial_prompt` and applies deterministic find/replace corrections post-transcription. Edit the file in any editor — changes take effect immediately.
+- **Auto-detects the language.** Speak German or English and each recording is transcribed in the language you actually spoke, not translated. Pin one language with `DICTATEUR_LANGUAGE` if you prefer.
 - **Works in any app.** Because results are pasted via the clipboard, Dictateur works in VS Code, browsers, Word, Obsidian, Claude Code terminals — anything that accepts paste.
 - **No GUI.** A background Python daemon plus an AutoHotkey v2 script. Start and forget.
 
@@ -83,25 +84,28 @@ The daemon logs to `%APPDATA%\archilles-dictateur\daemon.log` (rotated at 1 MB, 
 | Field                 | Default     | Notes                                        |
 | --------------------- | ----------- | -------------------------------------------- |
 | `model_size`          | `medium`    | Any faster-whisper model tag.                |
-| `language`            | `de`        | Whisper language code.                       |
+| `language`            | `auto`      | `auto` detects the spoken language per recording; a code like `en`, `de`, `fr` or `es` pins it. |
 | `host` / `port`       | `localhost:9876` | TCP endpoint the AHK client connects to.|
 | `sample_rate`         | `16000`     | Matches Whisper's expected input.            |
 | `device`              | `cuda`      | Auto-falls-back to `cpu` on failure.         |
 | `compute_type`        | `int8_float16` | Uses `int8` on CPU fallback.              |
 | `idle_unload_minutes` | `5.0`       | Release VRAM after this idle time; `0` keeps the model resident. |
 
-Four runtime knobs are read from the environment:
+Five runtime knobs are read from the environment:
 
 ```
 DICTATEUR_VOCABULARY_PATH=C:\path\to\your\Vokabular.md
 DICTATEUR_MODEL_SIZE=large-v3-turbo
 DICTATEUR_COMPUTE_TYPE=int8_float16
 DICTATEUR_IDLE_UNLOAD_MINUTES=10
+DICTATEUR_LANGUAGE=de
 ```
 
 Set them in `start.bat` (see the existing lines) or your shell before launching the daemon. If unset, the vocabulary store remains empty (transcription works without customization) and the model defaults from `DaemonConfig` apply.
 
 `DICTATEUR_MODEL_SIZE` / `DICTATEUR_COMPUTE_TYPE` trade VRAM for accuracy without editing code — `large-v3-turbo` with `int8_float16` fits in ~2 GB and transcribes German better still than `medium`, if you have the headroom.
+
+`DICTATEUR_LANGUAGE` defaults to `auto`: Whisper detects the language of each recording, so an English sentence is transcribed as English and a German one as German. Detection runs per recording, not per word, so dictate whole sentences — very short utterances can be misdetected. Set it to a fixed code like `de` if you only ever dictate in one language and want the steadier behaviour.
 
 ### Idle unloading
 
@@ -172,7 +176,7 @@ docs/              Design specs and implementation plans
 - Windows only. The AHK client is Windows-specific; porting the client to another OS (e.g., using `pynput` or an X11/Wayland equivalent) is plausible but hasn't been attempted.
 - Hotkey is hard-coded to `Ctrl + Left-Win` in `hotkey.ahk`. Change the two `^LWin::` blocks to remap.
 - Whisper is called synchronously on STOP. Very long recordings block the daemon until done.
-- German is the default language. Change `DaemonConfig.language` or pass a different Whisper model to work in other languages.
+- Language is auto-detected per recording by default. Set `DICTATEUR_LANGUAGE` (or `DaemonConfig.language`) to a fixed code like `de` to pin one language.
 
 ## License
 

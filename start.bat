@@ -17,6 +17,11 @@ REM Optional: minutes of idle time before the model releases its VRAM (default: 
 REM Set to 0 to keep the model resident for the whole session.
 REM set DICTATEUR_IDLE_UNLOAD_MINUTES=10
 
+REM Optional: spoken language. Default "auto" detects it per recording
+REM (English stays English, German stays German). Pin to a code like "de"
+REM to force one language — steadier for very short utterances.
+REM set DICTATEUR_LANGUAGE=de
+
 REM Start daemon in background (expliziter venv-Pfad)
 start /B "" "%~dp0venv\Scripts\python.exe" "%~dp0daemon.py"
 

@@ -39,7 +39,10 @@ from protocol import send_message, recv_message
 @dataclass
 class DaemonConfig:
     model_size: str = "medium"
-    language: str = "de"
+    # "auto" lets Whisper detect the spoken language per recording, so English
+    # stays English instead of being forced into German. Pin to a code like
+    # "de" to force one language (steadier for very short utterances).
+    language: str = "auto"
     port: int = 9876
     host: str = "localhost"
     sample_rate: int = 16000
@@ -119,8 +122,12 @@ class TranscriptionService:
     def __init__(self, model_size: str = "small", device: str = "cuda", compute_type: str = "float16"):
         self.model = WhisperModel(model_size, device=device, compute_type=compute_type)
 
-    def transcribe(self, audio: np.ndarray, language: str = "de", initial_prompt: str = "") -> str:
-        kwargs = {"language": language}
+    def transcribe(self, audio: np.ndarray, language: str = "auto", initial_prompt: str = "") -> str:
+        kwargs = {}
+        # "auto" (or empty/None) leaves language unset so Whisper detects it
+        # per recording. Any other value pins the decoder to that language.
+        if language and language != "auto":
+            kwargs["language"] = language
         if initial_prompt:
             kwargs["initial_prompt"] = initial_prompt
         # vad_filter strips silence; condition_on_previous_text=False prevents
@@ -306,6 +313,8 @@ def main():
         config.model_size = model_size
     if compute_type := os.environ.get("DICTATEUR_COMPUTE_TYPE"):
         config.compute_type = compute_type
+    if language := os.environ.get("DICTATEUR_LANGUAGE"):
+        config.language = language
     if idle := os.environ.get("DICTATEUR_IDLE_UNLOAD_MINUTES"):
         try:
             config.idle_unload_minutes = float(idle)

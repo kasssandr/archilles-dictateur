@@ -7,7 +7,7 @@ def test_config_defaults():
     cfg = DaemonConfig()
     assert cfg.model_size == "medium"
     assert cfg.compute_type == "int8_float16"
-    assert cfg.language == "de"
+    assert cfg.language == "auto"
     assert cfg.port == 9876
     assert cfg.sample_rate == 16000
     assert cfg.idle_unload_minutes == 5.0
@@ -74,3 +74,25 @@ def test_transcription_service_returns_string():
         audio = np.zeros(16000, dtype=np.float32)
         result = service.transcribe(audio)
         assert result == "Hallo Welt"
+
+
+def test_transcribe_auto_leaves_language_unset():
+    with patch("daemon.WhisperModel") as MockModel:
+        mock_instance = MagicMock()
+        mock_instance.transcribe.return_value = ([MagicMock(text="hi")], MagicMock())
+        MockModel.return_value = mock_instance
+        service = TranscriptionService(model_size="tiny", device="cpu", compute_type="int8")
+        service.transcribe(np.zeros(16000, dtype=np.float32), language="auto")
+        _, kwargs = mock_instance.transcribe.call_args
+        assert "language" not in kwargs, "auto must let Whisper detect the language"
+
+
+def test_transcribe_pins_explicit_language():
+    with patch("daemon.WhisperModel") as MockModel:
+        mock_instance = MagicMock()
+        mock_instance.transcribe.return_value = ([MagicMock(text="hallo")], MagicMock())
+        MockModel.return_value = mock_instance
+        service = TranscriptionService(model_size="tiny", device="cpu", compute_type="int8")
+        service.transcribe(np.zeros(16000, dtype=np.float32), language="de")
+        _, kwargs = mock_instance.transcribe.call_args
+        assert kwargs["language"] == "de"
