@@ -72,8 +72,9 @@ def test_transcription_service_returns_string():
         MockModel.return_value = mock_instance
         service = TranscriptionService(model_size="tiny", device="cpu", compute_type="int8")
         audio = np.zeros(16000, dtype=np.float32)
-        result = service.transcribe(audio)
-        assert result == "Hallo Welt"
+        text, language = service.transcribe(audio)
+        assert text == "Hallo Welt"
+        assert language == "de"
 
 
 def test_transcribe_auto_leaves_language_unset():

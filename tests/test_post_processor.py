@@ -118,3 +118,48 @@ def test_voice_combined_example():
     )
     expected = "Er sagte „Hallo Welt“\n\nUnd dann, dachte er"
     assert apply_voice_commands(text) == expected
+
+
+# --- Voice commands: language selection ---
+
+def test_voice_default_language_is_german():
+    assert apply_voice_commands("Hallo Absatz Welt") == "Hallo\n\nWelt"
+
+
+def test_voice_english_new_paragraph():
+    assert apply_voice_commands("Line one new paragraph Line two", "en") == "Line one\n\nLine two"
+
+
+def test_voice_english_comma_and_marks():
+    assert apply_voice_commands("Hello comma world", "en") == "Hello, world"
+    assert apply_voice_commands("Really question mark", "en") == "Really?"
+
+
+def test_voice_english_parens_hug_content():
+    assert apply_voice_commands("Text open paren inside close paren end", "en") == "Text (inside) end"
+
+
+def test_voice_english_quote_unquote():
+    assert apply_voice_commands("He said quote hello unquote", "en") == "He said “hello”"
+
+
+def test_voice_english_dash_and_hyphen():
+    assert apply_voice_commands("A dash B", "en") == "A – B"
+    assert apply_voice_commands("sign hyphen off", "en") == "sign-off"
+
+
+def test_voice_language_picks_the_matching_set():
+    # A German command word is inert when the English set is selected.
+    assert apply_voice_commands("Hallo Absatz Welt", "en") == "Hallo Absatz Welt"
+    # ...and vice versa.
+    assert apply_voice_commands("Line one new paragraph two", "de") == "Line one new paragraph two"
+
+
+def test_voice_language_code_is_normalised():
+    # Region suffixes and casing must not defeat the lookup.
+    assert apply_voice_commands("Hello comma world", "EN") == "Hello, world"
+    assert apply_voice_commands("Hello comma world", "en-US") == "Hello, world"
+
+
+def test_voice_unknown_language_falls_back_to_german():
+    assert apply_voice_commands("Hallo Absatz Welt", "no") == "Hallo\n\nWelt"

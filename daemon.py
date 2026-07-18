@@ -122,7 +122,7 @@ class TranscriptionService:
     def __init__(self, model_size: str = "small", device: str = "cuda", compute_type: str = "float16"):
         self.model = WhisperModel(model_size, device=device, compute_type=compute_type)
 
-    def transcribe(self, audio: np.ndarray, language: str = "auto", initial_prompt: str = "") -> str:
+    def transcribe(self, audio: np.ndarray, language: str = "auto", initial_prompt: str = "") -> tuple[str, str]:
         kwargs = {}
         # "auto" (or empty/None) leaves language unset so Whisper detects it
         # per recording. Any other value pins the decoder to that language.
@@ -132,13 +132,16 @@ class TranscriptionService:
             kwargs["initial_prompt"] = initial_prompt
         # vad_filter strips silence; condition_on_previous_text=False prevents
         # the repetition loops Whisper falls into on pauses in the audio.
-        segments, _ = self.model.transcribe(
+        segments, info = self.model.transcribe(
             audio,
             vad_filter=True,
             condition_on_previous_text=False,
             **kwargs,
         )
-        return "".join(seg.text for seg in segments).strip()
+        text = "".join(seg.text for seg in segments).strip()
+        # info.language is the detected code in auto mode, or the pinned one.
+        # It drives which voice-command set the daemon applies.
+        return text, info.language
 
 
 # --- Socket Server ---
@@ -236,14 +239,14 @@ class DaemonServer:
                         prompt = self.vocabulary.get_prompt()
                         with self._model_lock:
                             self._ensure_model()
-                            text = self.transcriber.transcribe(
+                            text, detected_language = self.transcriber.transcribe(
                                 audio,
                                 language=self.config.language,
                                 initial_prompt=prompt,
                             )
                             self._last_used = time.monotonic()
                         text = apply_corrections(text, self.vocabulary.get_corrections())
-                        text = apply_voice_commands(text)
+                        text = apply_voice_commands(text, detected_language)
                         self.logger.info("Transcribed: %s", text)
                         send_message(stream, f"RESULT:{text}")
                     except Exception as e:

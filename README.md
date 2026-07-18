@@ -12,7 +12,7 @@ Dictateur is the dictation front-end of the **Archilles** toolchain — a small 
 - **Gives the GPU back when idle.** After five minutes without dictation the model releases its VRAM, so a local LLM or another GPU job can use it. The next hotkey press reloads it while you are still speaking, so the reload costs no perceptible latency. Tune with `DICTATEUR_IDLE_UNLOAD_MINUTES`.
 - **Custom vocabulary, hot-reloaded.** Point the daemon at a Markdown file; it feeds domain terms to Whisper as an `initial_prompt` and applies deterministic find/replace corrections post-transcription. Edit the file in any editor — changes take effect immediately.
 - **Auto-detects the language.** Speak German or English and each recording is transcribed in the language you actually spoke, not translated. Pin one language with `DICTATEUR_LANGUAGE` if you prefer.
-- **Spoken punctuation.** Say `Absatz`, `Klammer auf`, `Gedankenstrich`, `Anführungszeichen zu` and the like; the daemon inserts the symbol locally. See [Voice commands](#voice-commands).
+- **Spoken punctuation, in both languages.** Say `Absatz` / `new paragraph`, `Klammer auf` / `open paren`, `Anführungszeichen zu` / `unquote` and the like; the daemon inserts the symbol locally, using the command set for whichever language you spoke. See [Voice commands](#voice-commands).
 - **Works in any app.** Because results are pasted via the clipboard, Dictateur works in VS Code, browsers, Word, Obsidian, Claude Code terminals — anything that accepts paste.
 - **No GUI.** A background Python daemon plus an AutoHotkey v2 script. Start and forget.
 
@@ -146,29 +146,37 @@ prompter -> prompt
 
 Whisper already sets commas and sentence periods from prosody. For punctuation and
 formatting it cannot infer, speak the command out loud and the daemon substitutes the
-symbol locally — no extra model, no latency:
+symbol locally — no extra model, no latency.
 
-| Say (German)                              | Inserts        |
-| ----------------------------------------- | -------------- |
-| `Absatz`                                  | blank line (¶) |
-| `neue Zeile`                              | line break     |
-| `Komma` · `Doppelpunkt` · `Semikolon`     | `,` `:` `;`    |
-| `Fragezeichen` · `Ausrufezeichen`         | `?` `!`        |
-| `Klammer auf` … `Klammer zu`              | `(` … `)`      |
-| `Anführungszeichen auf` … `Anführungszeichen zu` | `„` … `“` |
-| `Gedankenstrich`                          | `–` (spaced)   |
-| `Bindestrich` · `Schrägstrich`            | `-` `/`        |
+There is one command set per language, and the daemon picks it from the language Whisper
+detected for that recording (see [Language auto-detection](#configuration)). So a German
+sentence takes German commands and an English one takes English commands, with no manual
+switch — the same automatic behaviour as transcription itself.
+
+| Inserts        | Say (German)                               | Say (English)                       |
+| -------------- | ------------------------------------------ | ----------------------------------- |
+| blank line (¶) | `Absatz`                                    | `new paragraph`                     |
+| line break     | `neue Zeile`                                | `new line`                          |
+| `,` `:` `;`    | `Komma` · `Doppelpunkt` · `Semikolon`       | `comma` · `colon` · `semicolon`     |
+| `?` `!`        | `Fragezeichen` · `Ausrufezeichen`           | `question mark` · `exclamation mark`|
+| `(` … `)`      | `Klammer auf` … `Klammer zu`                | `open paren` … `close paren`        |
+| `“` … `”`      | `Anführungszeichen auf` … `Anführungszeichen zu` | `quote` … `unquote`           |
+| `–` (spaced)   | `Gedankenstrich`                            | `dash`                              |
+| `-` `/`        | `Bindestrich` · `Schrägstrich`              | `hyphen` · `slash`                  |
 
 Matching is case-insensitive and word-boundary sensitive, so `Absatz` inside
 `Absatzweise` is left alone. Detection is per word: speak the command as a distinct
 word. Two caveats:
 
-- **Collisions.** If you actually mean the word (\"der wunde Punkt\"), it still gets
-  replaced. That is why very common words are excluded — notably **`Punkt`**: Whisper
-  already ends sentences with periods, and the bare word appears too often in normal
-  speech. Add it yourself in `post_processor.py` if you want it.
+- **Collisions.** If you actually mean the word (\"der wunde Punkt\", \"he gave a
+  quote\"), it still gets replaced. That is why the sentence-ending period is excluded
+  from both sets — Whisper already adds it from prosody, and `Punkt` / `period` appear
+  too often in normal speech. Add it in `post_processor.py` if you want it.
 - Whisper occasionally mishears a command on very short, mumbled utterances — the same
   trade-off as language auto-detection. Speak whole, clear sentences.
+
+Command sets live in `_VOICE_COMMANDS` in `post_processor.py`, keyed by ISO code; extend
+or add a language there. A recording whose language matches no set falls back to German.
 
 ## Development
 
