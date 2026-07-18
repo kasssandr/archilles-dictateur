@@ -187,3 +187,14 @@ def test_voice_italian_set():
 def test_voice_russian_set():
     text = "Он сказал открыть кавычки привет мир закрыть кавычки новый абзац Конец запятая всё"
     assert apply_voice_commands(text, "ru") == "Он сказал «привет мир»\n\nКонец, всё"
+
+
+def test_voice_french_set_uses_spaced_guillemets():
+    text = "Il a dit ouvrir les guillemets bonjour le monde fermer les guillemets nouveau paragraphe Fin virgule voilà"
+    assert apply_voice_commands(text, "fr") == "Il a dit « bonjour le monde »\n\nFin, voilà"
+
+
+def test_voice_french_tolerates_curly_apostrophe():
+    # Whisper may emit a typographic apostrophe; the command must still match.
+    assert apply_voice_commands("Ça marche point d’interrogation", "fr") == "Ça marche?"
+    assert apply_voice_commands("Ça marche point d'interrogation", "fr") == "Ça marche?"

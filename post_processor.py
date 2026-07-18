@@ -14,9 +14,9 @@ import re
 #   "open"     — eats the space after it, keeps the one before (opening marks)
 #   "spaced"   — replaces the word only, leaving the surrounding spaces intact
 #
-# The sentence-ending period ("Punkt" / "period" / "punto" / "точка") is
-# deliberately absent from every set: Whisper already sets it from prosody, and
-# the bare word collides with normal speech too often.
+# The sentence-ending period ("Punkt" / "period" / "punto" / "точка" / "point")
+# is deliberately absent from every set: Whisper already sets it from prosody,
+# and the bare word collides with normal speech too often.
 _VOICE_COMMANDS: dict[str, list[tuple[str, str, str]]] = {
     "de": [
         # Line breaks and tight joiners — swallow the spaces around them.
@@ -109,6 +109,25 @@ _VOICE_COMMANDS: dict[str, list[tuple[str, str, str]]] = {
         ("открыть кавычки", "«", "open"),  # «
         ("тире", "–", "spaced"),  # –
     ],
+    # French uses guillemets too, but with an inner space: « comme ceci ». The
+    # space is baked into the replacement (regular space, not NBSP, so it pastes
+    # cleanly everywhere).
+    "fr": [
+        ("nouveau paragraphe", "\n\n", "collapse"),
+        ("nouvelle ligne", "\n", "collapse"),
+        ("trait d'union", "-", "collapse"),
+        ("barre oblique", "/", "collapse"),
+        ("virgule", ",", "left"),
+        ("deux points", ":", "left"),
+        ("point virgule", ";", "left"),
+        ("point d'interrogation", "?", "left"),
+        ("point d'exclamation", "!", "left"),
+        ("fermer la parenthèse", ")", "left"),
+        ("fermer les guillemets", " »", "left"),  # space before » (French style)
+        ("ouvrir la parenthèse", "(", "open"),
+        ("ouvrir les guillemets", "« ", "open"),  # space after « (French style)
+        ("tiret", "–", "spaced"),  # –
+    ],
 }
 
 # Language used when the detected code matches no set (mumbled fragments, an
@@ -129,10 +148,13 @@ _SPACING_PATTERNS = {
 def _compile(commands: list[tuple[str, str, str]]) -> list[tuple[re.Pattern, str]]:
     # Longest phrases first so a multi-word command wins over any shorter phrase
     # nested inside it (e.g. "open parenthesis" before "open paren").
-    return [
-        (re.compile(_SPACING_PATTERNS[cls].format(p=re.escape(phrase)), re.IGNORECASE), repl)
-        for phrase, repl, cls in sorted(commands, key=lambda c: len(c[0]), reverse=True)
-    ]
+    result = []
+    for phrase, repl, cls in sorted(commands, key=lambda c: len(c[0]), reverse=True):
+        # Match either apostrophe Whisper might emit (straight ' or curly ’),
+        # so French phrases like "point d'interrogation" are not missed.
+        escaped = re.escape(phrase).replace("'", "['’]")
+        result.append((re.compile(_SPACING_PATTERNS[cls].format(p=escaped), re.IGNORECASE), repl))
+    return result
 
 
 _COMPILED_VOICE_COMMANDS = {lang: _compile(cmds) for lang, cmds in _VOICE_COMMANDS.items()}
