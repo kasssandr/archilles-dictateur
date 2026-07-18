@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from post_processor import apply_corrections
+from post_processor import apply_corrections, apply_voice_commands
 from vocabulary import VocabularyStore
 
 # NVIDIA DLL-Verzeichnisse registrieren (Windows: cublas64_12.dll etc.)
@@ -243,6 +243,7 @@ class DaemonServer:
                             )
                             self._last_used = time.monotonic()
                         text = apply_corrections(text, self.vocabulary.get_corrections())
+                        text = apply_voice_commands(text)
                         self.logger.info("Transcribed: %s", text)
                         send_message(stream, f"RESULT:{text}")
                     except Exception as e:

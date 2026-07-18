@@ -1,4 +1,4 @@
-from post_processor import apply_corrections
+from post_processor import apply_corrections, apply_voice_commands
 
 
 def test_empty_text_returns_empty():
@@ -50,3 +50,71 @@ def test_special_regex_characters_in_key_are_escaped():
     assert apply_corrections("C.D", {"C.D": "CD"}) == "CD"
     # And should not match "CXD"
     assert apply_corrections("CXD", {"C.D": "CD"}) == "CXD"
+
+
+# --- Voice commands ---
+
+def test_voice_empty_text_returns_empty():
+    assert apply_voice_commands("") == ""
+
+
+def test_voice_no_command_returns_text_unchanged():
+    assert apply_voice_commands("Ein ganz normaler Satz.") == "Ein ganz normaler Satz."
+
+
+def test_voice_absatz_becomes_blank_line_and_collapses_spaces():
+    assert apply_voice_commands("Satz eins Absatz Satz zwei") == "Satz eins\n\nSatz zwei"
+
+
+def test_voice_neue_zeile_becomes_single_newline():
+    assert apply_voice_commands("Zeile eins neue Zeile Zeile zwei") == "Zeile eins\nZeile zwei"
+
+
+def test_voice_komma_attaches_to_preceding_word():
+    assert apply_voice_commands("Hallo Komma Welt") == "Hallo, Welt"
+
+
+def test_voice_fragezeichen_and_ausrufezeichen_attach_left():
+    assert apply_voice_commands("Wirklich Fragezeichen") == "Wirklich?"
+    assert apply_voice_commands("Achtung Ausrufezeichen") == "Achtung!"
+
+
+def test_voice_doppelpunkt_and_semikolon():
+    assert apply_voice_commands("Beispiel Doppelpunkt Text") == "Beispiel: Text"
+    assert apply_voice_commands("eins Semikolon zwei") == "eins; zwei"
+
+
+def test_voice_klammern_hug_their_content():
+    text = "Text Klammer auf Inhalt Klammer zu Ende"
+    assert apply_voice_commands(text) == "Text (Inhalt) Ende"
+
+
+def test_voice_anfuehrungszeichen_hug_their_content():
+    text = "Er sagte Anführungszeichen auf Hallo Welt Anführungszeichen zu"
+    assert apply_voice_commands(text) == "Er sagte „Hallo Welt“"
+
+
+def test_voice_gedankenstrich_keeps_surrounding_spaces():
+    assert apply_voice_commands("Wort Gedankenstrich Wort") == "Wort – Wort"
+
+
+def test_voice_bindestrich_joins_tightly():
+    assert apply_voice_commands("E Bindestrich Mail") == "E-Mail"
+
+
+def test_voice_is_case_insensitive():
+    assert apply_voice_commands("Satz eins absatz Satz zwei") == "Satz eins\n\nSatz zwei"
+
+
+def test_voice_word_boundary_prevents_substring_match():
+    # "Absatz" inside "Absatzweise" must not trigger a line break.
+    assert apply_voice_commands("Absatzweise vorgehen") == "Absatzweise vorgehen"
+
+
+def test_voice_combined_example():
+    text = (
+        "Er sagte Anführungszeichen auf Hallo Welt Anführungszeichen zu "
+        "Absatz Und dann Komma dachte er"
+    )
+    expected = "Er sagte „Hallo Welt“\n\nUnd dann, dachte er"
+    assert apply_voice_commands(text) == expected
