@@ -175,6 +175,9 @@ word. Two caveats:
 - Whisper occasionally mishears a command on very short, mumbled utterances — the same
   trade-off as language auto-detection. Speak whole, clear sentences.
 
+Opening marks also swallow the stray comma Whisper likes to insert at the pause right
+after a spoken command, so `Anführungszeichen auf, Wort` still yields `„Wort`, not `„, Wort`.
+
 Command sets live in `_VOICE_COMMANDS` in `post_processor.py`, keyed by ISO code; extend
 or add a language there. A recording whose language matches no set falls back to German.
 

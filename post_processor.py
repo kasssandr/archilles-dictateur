@@ -68,7 +68,10 @@ _DEFAULT_COMMAND_LANG = "de"
 _SPACING_PATTERNS = {
     "collapse": r"\s*\b{p}\b\s*",
     "left": r"\s*\b{p}\b",
-    "open": r"\b{p}\b\s*",
+    # An opening mark hugs the following word. It also swallows one stray comma
+    # that Whisper tends to insert at the pause after the spoken command, so
+    # "Anführungszeichen auf, Wort" becomes „Wort and not „, Wort.
+    "open": r"\b{p}\b\s*,?\s*",
     "spaced": r"\b{p}\b",
 }
 

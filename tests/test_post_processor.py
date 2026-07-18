@@ -163,3 +163,12 @@ def test_voice_language_code_is_normalised():
 
 def test_voice_unknown_language_falls_back_to_german():
     assert apply_voice_commands("Hallo Absatz Welt", "no") == "Hallo\n\nWelt"
+
+
+def test_voice_open_mark_swallows_whispers_pause_comma():
+    # Whisper often inserts a comma at the pause after the spoken command; the
+    # opening mark must still hug the content, not leave ", " behind it.
+    text = "Er sagte Anführungszeichen auf, sogenannte Wörter Anführungszeichen zu"
+    assert apply_voice_commands(text) == "Er sagte „sogenannte Wörter“"
+    # Same for opening parens.
+    assert apply_voice_commands("Text Klammer auf, Inhalt Klammer zu", "de") == "Text (Inhalt)"
