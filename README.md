@@ -12,7 +12,7 @@ Dictateur is the dictation front-end of the **Archilles** toolchain — a small 
 - **Gives the GPU back when idle.** After five minutes without dictation the model releases its VRAM, so a local LLM or another GPU job can use it. The next hotkey press reloads it while you are still speaking, so the reload costs no perceptible latency. Tune with `DICTATEUR_IDLE_UNLOAD_MINUTES`.
 - **Custom vocabulary, hot-reloaded.** Point the daemon at a Markdown file; it feeds domain terms to Whisper as an `initial_prompt` and applies deterministic find/replace corrections post-transcription. Edit the file in any editor — changes take effect immediately.
 - **Auto-detects the language.** Speak German or English and each recording is transcribed in the language you actually spoke, not translated. Pin one language with `DICTATEUR_LANGUAGE` if you prefer.
-- **Spoken punctuation, per language.** Say `Absatz` / `new paragraph`, `Klammer auf` / `open paren`, `Anführungszeichen zu` / `unquote` and the like; the daemon inserts the symbol locally, using the command set for whichever language you spoke (German, English, Spanish, Italian, Russian, French). See [Voice commands](#voice-commands).
+- **Spoken punctuation, per language.** Say `neuer Absatz` / `new paragraph`, `Klammer auf` / `open paren`, `Anführungszeichen zu` / `unquote` and the like; the daemon inserts the symbol locally, using the command set for whichever language you spoke (German, English, Spanish, Italian, Russian, French). See [Voice commands](#voice-commands).
 - **Works in any app.** Because results are pasted via the clipboard, Dictateur works in VS Code, browsers, Word, Obsidian, Claude Code terminals — anything that accepts paste.
 - **No GUI.** A background Python daemon plus an AutoHotkey v2 script. Start and forget.
 
@@ -155,7 +155,7 @@ switch — the same automatic behaviour as transcription itself.
 
 | Inserts        | Say (German)                               | Say (English)                       |
 | -------------- | ------------------------------------------ | ----------------------------------- |
-| blank line (¶) | `Absatz`                                    | `new paragraph`                     |
+| blank line (¶) | `neuer Absatz`                              | `new paragraph`                     |
 | line break     | `neue Zeile`                                | `new line`                          |
 | `,` `:` `;`    | `Komma` · `Doppelpunkt` · `Semikolon`       | `comma` · `colon` · `semicolon`     |
 | `?` `!`        | `Fragezeichen` · `Ausrufezeichen`           | `question mark` · `exclamation mark`|
@@ -172,7 +172,10 @@ and none in the others (`«so»`), per each language's typography. See `_VOICE_C
 `post_processor.py` for the full lists.
 
 Matching is case-insensitive and word-boundary sensitive, so `Absatz` inside
-`Absatzweise` is left alone. Detection is per word: speak the command as a distinct
+`Absatzweise` is left alone. The German blank-line command is the two-word phrase
+`neuer Absatz` rather than the bare `Absatz`, since the latter is a common German
+word on its own (a shoe heel, sales figures, a paragraph reference) and would
+misfire in normal speech. Detection is per word: speak the command as a distinct
 word. Two caveats:
 
 - **Collisions.** If you actually mean the word (\"der wunde Punkt\", \"he gave a

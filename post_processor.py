@@ -20,7 +20,7 @@ import re
 _VOICE_COMMANDS: dict[str, list[tuple[str, str, str]]] = {
     "de": [
         # Line breaks and tight joiners — swallow the spaces around them.
-        ("Absatz", "\n\n", "collapse"),
+        ("neuer Absatz", "\n\n", "collapse"),
         ("neue Zeile", "\n", "collapse"),
         ("Bindestrich", "-", "collapse"),
         ("Schrägstrich", "/", "collapse"),

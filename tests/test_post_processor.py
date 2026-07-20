@@ -63,7 +63,13 @@ def test_voice_no_command_returns_text_unchanged():
 
 
 def test_voice_absatz_becomes_blank_line_and_collapses_spaces():
-    assert apply_voice_commands("Satz eins Absatz Satz zwei") == "Satz eins\n\nSatz zwei"
+    assert apply_voice_commands("Satz eins neuer Absatz Satz zwei") == "Satz eins\n\nSatz zwei"
+
+
+def test_voice_bare_absatz_does_not_trigger():
+    # The bare word "Absatz" is common in normal speech (e.g. shoe heel, sales
+    # figures); only the full phrase "neuer Absatz" must trigger a line break.
+    assert apply_voice_commands("Der Absatz des Schuhs") == "Der Absatz des Schuhs"
 
 
 def test_voice_neue_zeile_becomes_single_newline():
@@ -103,7 +109,7 @@ def test_voice_bindestrich_joins_tightly():
 
 
 def test_voice_is_case_insensitive():
-    assert apply_voice_commands("Satz eins absatz Satz zwei") == "Satz eins\n\nSatz zwei"
+    assert apply_voice_commands("Satz eins neuer absatz Satz zwei") == "Satz eins\n\nSatz zwei"
 
 
 def test_voice_word_boundary_prevents_substring_match():
@@ -114,7 +120,7 @@ def test_voice_word_boundary_prevents_substring_match():
 def test_voice_combined_example():
     text = (
         "Er sagte Anführungszeichen auf Hallo Welt Anführungszeichen zu "
-        "Absatz Und dann Komma dachte er"
+        "neuer Absatz Und dann Komma dachte er"
     )
     expected = "Er sagte „Hallo Welt“\n\nUnd dann, dachte er"
     assert apply_voice_commands(text) == expected
@@ -123,7 +129,7 @@ def test_voice_combined_example():
 # --- Voice commands: language selection ---
 
 def test_voice_default_language_is_german():
-    assert apply_voice_commands("Hallo Absatz Welt") == "Hallo\n\nWelt"
+    assert apply_voice_commands("Hallo neuer Absatz Welt") == "Hallo\n\nWelt"
 
 
 def test_voice_english_new_paragraph():
@@ -150,7 +156,7 @@ def test_voice_english_dash_and_hyphen():
 
 def test_voice_language_picks_the_matching_set():
     # A German command word is inert when the English set is selected.
-    assert apply_voice_commands("Hallo Absatz Welt", "en") == "Hallo Absatz Welt"
+    assert apply_voice_commands("Hallo neuer Absatz Welt", "en") == "Hallo neuer Absatz Welt"
     # ...and vice versa.
     assert apply_voice_commands("Line one new paragraph two", "de") == "Line one new paragraph two"
 
@@ -162,7 +168,7 @@ def test_voice_language_code_is_normalised():
 
 
 def test_voice_unknown_language_falls_back_to_german():
-    assert apply_voice_commands("Hallo Absatz Welt", "no") == "Hallo\n\nWelt"
+    assert apply_voice_commands("Hallo neuer Absatz Welt", "no") == "Hallo\n\nWelt"
 
 
 def test_voice_open_mark_swallows_whispers_pause_comma():
