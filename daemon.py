@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from cloud_transcription import BACKENDS as CLOUD_BACKENDS
+from cloud_transcription import CloudTranscriptionError
 from hallucination_filter import filter_transcript, is_accidental_recording, longest_voiced_run
 from post_processor import apply_corrections, apply_voice_commands
 from vocabulary import VocabularyStore
@@ -56,6 +58,12 @@ class DaemonConfig:
     # Release the model's VRAM after this much idle time, so other GPU
     # workloads can use it. 0 keeps the model resident for the whole session.
     idle_unload_minutes: float = 5.0
+    # "local" (faster-whisper on this machine), or a cloud backend from
+    # cloud_transcription.BACKENDS ("openrouter", "groq"): the audio is sent
+    # there and the local model is loaded only if a cloud call fails.
+    backend: str = "local"
+    cloud_model: str = ""  # empty: the backend's default model
+    cloud_api_key: str = field(default="", repr=False)
 
 
 # --- Logging ---
@@ -164,6 +172,20 @@ class DaemonServer:
         # Reentrant because transcription takes the lock and then calls _ensure_model.
         self._model_lock = threading.RLock()
         self._last_used = time.monotonic()
+        self.cloud = None
+        if config.backend in CLOUD_BACKENDS:
+            backend_cls = CLOUD_BACKENDS[config.backend]
+            try:
+                self.cloud = backend_cls(
+                    api_key=config.cloud_api_key,
+                    model=config.cloud_model or backend_cls.DEFAULT_MODEL,
+                    sample_rate=config.sample_rate,
+                )
+                self.logger.info("Backend: %s (%s), local model as fallback", self.cloud.name, self.cloud.model)
+            except CloudTranscriptionError as e:
+                self.logger.error("%s backend unavailable, using local model: %s", backend_cls.name, e)
+        elif config.backend != "local":
+            self.logger.error("Unknown backend %r, using local model", config.backend)
 
     def _load_model(self):
         try:
@@ -197,6 +219,33 @@ class DaemonServer:
             gc.collect()
             self.logger.info("Whisper model unloaded after %.0f min idle", self.config.idle_unload_minutes)
 
+    def _transcribe_local(self, audio: np.ndarray, prompt: str) -> tuple[str, str]:
+        with self._model_lock:
+            self._ensure_model()
+            result = self.transcriber.transcribe(audio, language=self.config.language, initial_prompt=prompt)
+            self._last_used = time.monotonic()
+        return result
+
+    def _transcribe(self, audio: np.ndarray, prompt: str) -> tuple[str, str]:
+        """Text and language code, from the cloud backend if configured. A failed
+        cloud call (network, quota, provider) falls back to the local model, so a
+        dictation is never lost to a connection problem."""
+        if self.cloud is not None:
+            try:
+                return self.cloud.transcribe(audio, language=self.config.language, initial_prompt=prompt)
+            except CloudTranscriptionError as e:
+                if e.permanent:
+                    # Wrong key, no credit, no access: every further call would
+                    # fail the same way and cost a round trip. Stay local for the
+                    # rest of the session; the next START preloads the model again.
+                    self.logger.error(
+                        "%s failed permanently, local model for the rest of the session "
+                        "(fix and restart to retry): %s", self.cloud.name, e)
+                    self.cloud = None
+                else:
+                    self.logger.warning("%s failed, using local model: %s", self.cloud.name, e)
+        return self._transcribe_local(audio, prompt)
+
     def _idle_watcher(self):
         timeout = self.config.idle_unload_minutes * 60
         while self.running:
@@ -225,8 +274,10 @@ class DaemonServer:
                         self.logger.info("Recording started")
                         # Reload in the background if the idle watcher unloaded the
                         # model: it becomes ready while the user is still speaking,
-                        # so the load never shows up as latency.
-                        threading.Thread(target=self._ensure_model, daemon=True).start()
+                        # so the load never shows up as latency. With the cloud
+                        # backend the model is only loaded as a fallback.
+                        if self.cloud is None:
+                            threading.Thread(target=self._ensure_model, daemon=True).start()
                     except Exception as e:
                         self.logger.error("Mic error: %s", e)
                         send_message(stream, f"ERROR:NO_MIC:{e}")
@@ -247,14 +298,7 @@ class DaemonServer:
                         # vocabulary is only passed once there is enough speech.
                         long_enough = len(audio) >= PROMPT_MIN_SECONDS * rate
                         prompt = self.vocabulary.get_prompt() if long_enough else ""
-                        with self._model_lock:
-                            self._ensure_model()
-                            text, detected_language = self.transcriber.transcribe(
-                                audio,
-                                language=self.config.language,
-                                initial_prompt=prompt,
-                            )
-                            self._last_used = time.monotonic()
+                        text, detected_language = self._transcribe(audio, prompt)
                         raw = text
                         text = filter_transcript(text, longest_voiced_run(audio, rate))
                         if text != raw.strip():
@@ -283,7 +327,7 @@ class DaemonServer:
             # Stay out of VRAM until the first dictation actually needs the model.
             threading.Thread(target=self._idle_watcher, daemon=True).start()
             self.logger.info("Idle unloading active: %.1f min", self.config.idle_unload_minutes)
-        else:
+        elif self.cloud is None:
             self._ensure_model()
 
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -333,6 +377,12 @@ def main():
         config.compute_type = compute_type
     if language := os.environ.get("DICTATEUR_LANGUAGE"):
         config.language = language
+    if backend := os.environ.get("DICTATEUR_BACKEND"):
+        config.backend = backend.strip().lower()
+    if config.backend in CLOUD_BACKENDS:
+        prefix = config.backend.upper()  # OPENROUTER / GROQ
+        config.cloud_model = os.environ.get(f"DICTATEUR_{prefix}_MODEL", "")
+        config.cloud_api_key = os.environ.get(f"{prefix}_API_KEY", "")
     if idle := os.environ.get("DICTATEUR_IDLE_UNLOAD_MINUTES"):
         try:
             config.idle_unload_minutes = float(idle)

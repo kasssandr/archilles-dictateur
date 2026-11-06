@@ -97,3 +97,103 @@ def test_transcribe_pins_explicit_language():
         service.transcribe(np.zeros(16000, dtype=np.float32), language="de")
         _, kwargs = mock_instance.transcribe.call_args
         assert kwargs["language"] == "de"
+
+
+# --- Backend selection ---
+
+def test_backend_defaults_to_local():
+    server = DaemonServer(DaemonConfig())
+    assert server.cloud is None
+
+
+def test_openrouter_without_key_falls_back_to_local():
+    server = DaemonServer(DaemonConfig(backend="openrouter", cloud_api_key=""))
+    assert server.cloud is None
+
+
+def test_api_key_is_not_in_config_repr():
+    assert "secret" not in repr(DaemonConfig(cloud_api_key="secret"))
+
+
+@patch("daemon.WhisperModel")
+def test_openrouter_backend_skips_local_model(MockModel):
+    server = DaemonServer(DaemonConfig(backend="openrouter", cloud_api_key="k"))
+    server.cloud = MagicMock()
+    server.cloud.transcribe.return_value = ("Hallo", "de")
+    assert server._transcribe(np.zeros(16000, dtype=np.float32), "") == ("Hallo", "de")
+    MockModel.assert_not_called()
+    assert server.transcriber is None
+
+
+@patch("daemon.WhisperModel")
+def test_cloud_failure_falls_back_to_local_model(MockModel):
+    from cloud_transcription import CloudTranscriptionError
+
+    mock_instance = MagicMock()
+    mock_instance.transcribe.return_value = ([MagicMock(text="lokal")], MagicMock(language="de"))
+    MockModel.return_value = mock_instance
+    server = DaemonServer(DaemonConfig(backend="openrouter", cloud_api_key="k"))
+    server.cloud = MagicMock()
+    server.cloud.transcribe.side_effect = CloudTranscriptionError("HTTP 429: quota")
+    assert server._transcribe(np.zeros(16000, dtype=np.float32), "") == ("lokal", "de")
+    MockModel.assert_called_once()
+
+
+@patch("daemon.WhisperModel")
+def test_permanent_cloud_error_disables_cloud_for_session(MockModel):
+    from cloud_transcription import CloudTranscriptionError
+
+    mock_instance = MagicMock()
+    mock_instance.transcribe.return_value = ([MagicMock(text="lokal")], MagicMock(language="de"))
+    MockModel.return_value = mock_instance
+    server = DaemonServer(DaemonConfig(backend="openrouter", cloud_api_key="k"))
+    cloud = MagicMock()
+    cloud.name = "OpenRouter"
+    cloud.transcribe.side_effect = CloudTranscriptionError("HTTP 402: no credit", status=402)
+    server.cloud = cloud
+
+    server._transcribe(np.zeros(16000, dtype=np.float32), "")
+    assert server.cloud is None, "no credit will not fix itself; stop paying the round trip"
+    server._transcribe(np.zeros(16000, dtype=np.float32), "")
+    cloud.transcribe.assert_called_once()
+
+
+@patch("daemon.WhisperModel")
+def test_transient_cloud_error_keeps_cloud(MockModel):
+    from cloud_transcription import CloudTranscriptionError
+
+    mock_instance = MagicMock()
+    mock_instance.transcribe.return_value = ([MagicMock(text="lokal")], MagicMock(language="de"))
+    MockModel.return_value = mock_instance
+    server = DaemonServer(DaemonConfig(backend="groq", cloud_api_key="k"))
+    cloud = MagicMock()
+    cloud.name = "Groq"
+    cloud.transcribe.side_effect = CloudTranscriptionError("HTTP 429: slow down", status=429)
+    server.cloud = cloud
+    server._transcribe(np.zeros(16000, dtype=np.float32), "")
+    assert server.cloud is cloud
+
+
+def test_groq_backend_uses_default_model():
+    server = DaemonServer(DaemonConfig(backend="groq", cloud_api_key="k"))
+    assert server.cloud.name == "Groq"
+    assert server.cloud.model == "whisper-large-v3"
+
+
+def test_unknown_backend_stays_local():
+    assert DaemonServer(DaemonConfig(backend="nonsense", cloud_api_key="k")).cloud is None
+
+
+def test_main_reads_backend_specific_env(monkeypatch):
+    import daemon
+
+    monkeypatch.setenv("DICTATEUR_BACKEND", "Groq")
+    monkeypatch.setenv("GROQ_API_KEY", "gk")
+    monkeypatch.setenv("DICTATEUR_GROQ_MODEL", "whisper-large-v3-turbo")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "ork")
+    captured = {}
+    monkeypatch.setattr(daemon, "DaemonServer", lambda cfg: captured.setdefault("cfg", cfg) and MagicMock())
+    monkeypatch.setattr(daemon.signal, "signal", lambda *a: None)
+    daemon.main()
+    cfg = captured["cfg"]
+    assert (cfg.backend, cfg.cloud_api_key, cfg.cloud_model) == ("groq", "gk", "whisper-large-v3-turbo")
