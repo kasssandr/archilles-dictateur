@@ -1,13 +1,13 @@
 # Dictateur
 
-System-wide, offline push-to-talk dictation for Windows. Hold a hotkey, speak, release — your words appear in whatever text field has focus. By default, transcription runs locally via [faster-whisper](https://github.com/SYSTRAN/faster-whisper) and no audio leaves your machine; optional [cloud backends](#cloud-backends-openrouter-groq) (Groq, OpenRouter) trade that for a larger model and a free GPU.
+System-wide push-to-talk dictation for Windows. Hold a hotkey, speak, release — your words appear in whatever text field has focus. By default, transcription runs locally via [faster-whisper](https://github.com/SYSTRAN/faster-whisper) and no audio leaves your machine; optional [cloud backends](#cloud-backends) (Groq, OpenAI, OpenRouter, Gemini) trade that for a larger model and a free GPU.
 
 Dictateur is the dictation front-end of the **Archilles** toolchain — a small family of local-first language tools. Its sibling, the [Archillator](https://archilles.org/archillator/), cleans, corrects, and translates long-form text. Dictateur handles the input side: getting words from voice into any application (IDE, browser, chat, editor) without switching contexts.
 
 ## Features
 
 - **Push-to-talk, globally.** Hold `Ctrl + Left-Win`, speak, release. Transcribed text is pasted into the active window.
-- **Local by default, cloud if you want.** Audio is recorded, transcribed, and discarded on your machine. Set `DICTATEUR_BACKEND=groq` or `openrouter` to transcribe in the cloud instead, with the local model as automatic fallback.
+- **Local by default, cloud if you want.** Audio is recorded, transcribed, and discarded on your machine. Set `DICTATEUR_BACKEND` to `groq`, `openai`, `openrouter` or `gemini` to transcribe in the cloud instead, with the local model as automatic fallback.
 - **GPU-accelerated with CPU fallback.** Uses CUDA + `int8_float16` when available; falls back transparently to CPU `int8`.
 - **Gives the GPU back when idle.** After five minutes without dictation the model releases its VRAM, so a local LLM or another GPU job can use it. The next hotkey press reloads it while you are still speaking, so the reload costs no perceptible latency. Tune with `DICTATEUR_IDLE_UNLOAD_MINUTES`.
 - **Custom vocabulary, hot-reloaded.** Point the daemon at a Markdown file; it feeds domain terms to Whisper as an `initial_prompt` and applies deterministic find/replace corrections post-transcription. Edit the file in any editor — changes take effect immediately.
@@ -27,7 +27,10 @@ Dictateur is the dictation front-end of the **Archilles** toolchain — a small 
 │                      │                            │                            │
 │ Ctrl+LWin → record   │                            │ AudioRecorder              │
 │ release  → paste     │                            │ TranscriptionService       │
-└──────────────────────┘                            │ VocabularyStore (watchdog) │
+└──────────────────────┘                            │  or cloud backend ─────────┼──► Groq / OpenAI /
+                                                    │ HallucinationFilter        │    OpenRouter / Gemini
+                                                    │ corrections, commands      │
+                                                    │ VocabularyStore (watchdog) │
                                                     └────────────────────────────┘
 ```
 
@@ -38,7 +41,7 @@ The protocol is a minimal length-prefixed text framing (`protocol.py`). The daem
 - **Windows 10/11** (tested on Windows 11).
 - **Python 3.10+**.
 - **[AutoHotkey v2](https://www.autohotkey.com/)** installed at the default location (`%LOCALAPPDATA%\Programs\AutoHotkey\v2\AutoHotkey64.exe`). Adjust `start.bat` if yours lives elsewhere.
-- **NVIDIA GPU with CUDA** recommended (any recent consumer card works; the daemon uses the `medium` Whisper model in `int8_float16`, which needs roughly 0.75 GB of VRAM). Without CUDA, the daemon automatically falls back to CPU at `int8` — slower but functional.
+- **NVIDIA GPU with CUDA** recommended for local transcription (any recent consumer card works; the daemon uses the `medium` Whisper model in `int8_float16`, which needs roughly 0.75 GB of VRAM). Without CUDA, the daemon automatically falls back to CPU at `int8` — slower but functional. With a [cloud backend](#cloud-backends) the GPU is only used as a fallback.
 - **A working microphone** reachable through the default Windows audio device.
 
 ## Installation
@@ -102,10 +105,10 @@ DICTATEUR_MODEL_SIZE=large-v3-turbo
 DICTATEUR_COMPUTE_TYPE=int8_float16
 DICTATEUR_IDLE_UNLOAD_MINUTES=10
 DICTATEUR_LANGUAGE=de
-DICTATEUR_BACKEND=groq                (see "Cloud backends" below)
-DICTATEUR_GROQ_MODEL=whisper-large-v3   / DICTATEUR_OPENROUTER_MODEL=...
-GROQ_API_KEY=gsk_...                  / OPENROUTER_API_KEY=sk-or-...
+DICTATEUR_BACKEND=groq
 ```
+
+`DICTATEUR_BACKEND` and the matching key and model variables are described under [Cloud backends](#cloud-backends).
 
 Set them in `start.bat` (see the existing lines) or your shell before launching the daemon. If unset, the vocabulary store remains empty (transcription works without customization) and the model defaults from `DaemonConfig` apply.
 
@@ -123,27 +126,41 @@ If that trade annoys you, raise `DICTATEUR_IDLE_UNLOAD_MINUTES` (fewer unloads, 
 
 Set `DICTATEUR_IDLE_UNLOAD_MINUTES=0` to disable unloading and keep the model resident for the whole session — the old behaviour, and the right choice when the GPU is yours alone.
 
-## Cloud backends (OpenRouter, Groq)
+## Cloud backends
 
-`DICTATEUR_BACKEND` picks where the audio is transcribed: `local` (default), `groq` or `openrouter`. With a cloud backend the daemon sends each recording as a WAV to the provider and does not touch the GPU. Everything after transcription — hallucination filter, corrections, voice commands — runs locally as before.
+`DICTATEUR_BACKEND` picks where the audio is transcribed: `local` (default), `groq`, `openai`, `openrouter` or `gemini`. With a cloud backend the daemon sends each recording as a WAV to the provider and does not touch the GPU. Everything after transcription — hallucination filter, corrections, voice commands — runs locally as before.
 
-| Backend      | Key variable         | Model variable (default)                                 |
-| ------------ | -------------------- | -------------------------------------------------------- |
-| `groq`       | `GROQ_API_KEY`       | `DICTATEUR_GROQ_MODEL` (`whisper-large-v3`)              |
-| `openrouter` | `OPENROUTER_API_KEY` | `DICTATEUR_OPENROUTER_MODEL` (`openai/whisper-large-v3`) |
+| Backend      | Key variable         | Model variable               | Default model             |
+| ------------ | -------------------- | ---------------------------- | ------------------------- |
+| `groq`       | `GROQ_API_KEY`       | `DICTATEUR_GROQ_MODEL`       | `whisper-large-v3`        |
+| `openai`     | `OPENAI_API_KEY`     | `DICTATEUR_OPENAI_MODEL`     | `whisper-1`               |
+| `openrouter` | `OPENROUTER_API_KEY` | `DICTATEUR_OPENROUTER_MODEL` | `openai/whisper-large-v3` |
+| `gemini`     | `GEMINI_API_KEY`     | `DICTATEUR_GEMINI_MODEL`     | `gemini-3.6-flash`        |
 
 ```
 setx GROQ_API_KEY gsk_...
 setx DICTATEUR_BACKEND groq
 ```
 
-`setx` only reaches processes started afterwards: run `stop.bat` and `start.bat` from a new window. `setx DICTATEUR_BACKEND local` switches back. Store keys this way, not in `start.bat`, which is part of the repository.
+`setx` only reaches processes started afterwards: run `stop.bat` and `start.bat` from a new window (or from Explorer). `setx DICTATEUR_BACKEND local` switches back; the keys can stay, the local backend ignores them. Store keys this way, not in `start.bat`, which is part of the repository. The log confirms the active backend with a line like `Backend: Groq (whisper-large-v3), local model as fallback`.
 
-- **[Groq](https://console.groq.com/docs/speech-to-text)** runs Whisper directly. Its free tier covers dictation comfortably (at the time of writing about 2,000 requests and 8 hours of audio per day; each request counts at least 10 s). `whisper-large-v3-turbo` is the faster, slightly less accurate alternative.
-- **[OpenRouter](https://openrouter.ai/docs/guides/overview/multimodal/stt)** routes to many speech-to-text models; any slug from `https://openrouter.ai/api/v1/models?output_modalities=transcription` works. It needs credit (audio requests require a balance of at least $0.50); `openai/whisper-large-v3` costs about $0.03 per hour of audio. Requests ask to be routed only to providers that do not collect data for training (`provider.data_collection: "deny"`).
-- **The audio leaves your machine.** Beyond the routing preference above, the provider's own terms apply.
-- **Fallback.** If a call fails, the daemon logs the reason and transcribes locally instead. Temporary failures (no network, timeout, rate limit, provider error) are retried with the next dictation. A wrong key, missing credit or missing access (HTTP 401/402/403) switches the daemon to the local model for the rest of the session, so later dictations neither wait for a doomed request nor lose the model preload; fix the cause and restart. A missing key keeps the daemon local from the start.
-- **Vocabulary.** The prompt from your vocabulary file is passed along (Groq: `prompt`; OpenRouter: as a provider option where supported).
+**Which one?**
+
+- **[Groq](https://console.groq.com/docs/speech-to-text)** runs Whisper directly and is the easiest start. Its free tier covers dictation comfortably (at the time of writing about 2,000 requests and 8 hours of audio per day; each request counts at least 10 s). `whisper-large-v3-turbo` is the faster, slightly less accurate alternative.
+- **[OpenAI](https://platform.openai.com/docs/guides/speech-to-text)** defaults to `whisper-1`, which reports the spoken language and so keeps the voice commands language-aware. The newer `gpt-transcribe` and `gpt-4o-transcribe` models are language-model based and may smooth the wording slightly.
+- **[OpenRouter](https://openrouter.ai/docs/guides/overview/multimodal/stt)** routes to many speech-to-text models from one key; any slug from `https://openrouter.ai/api/v1/models?output_modalities=transcription` works. It needs credit (audio requests require a balance of at least $0.50); `openai/whisper-large-v3` costs about $0.03 per hour of audio. Requests ask to be routed only to providers that do not collect data for training (`provider.data_collection: "deny"`).
+- **[Gemini](https://ai.google.dev/gemini-api/docs/audio)** is a general language model, not a speech recognizer. Dictateur instructs it to transcribe verbatim and never to answer what was said, but it may still tidy up the wording more than Whisper does. Google's terms let it use content sent on the *unpaid* tier to improve its products (users in the EEA, Switzerland and the UK get the paid-tier data terms) — check the current terms before dictating anything sensitive.
+
+**Why no Anthropic backend?** The Claude API accepts text, images and PDFs, but no audio, and Anthropic offers no speech-to-text endpoint (as of November 2026). A Claude key cannot transcribe; it would fit a later text step instead, such as restructuring a finished transcript.
+
+Groq is in daily use; the OpenAI and Gemini backends are written against the providers' documented APIs and verified only up to authentication. Reports welcome.
+
+**Shared by all backends:**
+
+- **The audio leaves your machine.** The provider's own data terms apply.
+- **Fallback.** If a call fails, the daemon logs the reason and transcribes locally instead. Temporary failures (no network, timeout, rate limit, provider error) are retried with the next dictation. A wrong key, missing credit, missing access or an unknown model (HTTP 401/402/403/404) switches the daemon to the local model for the rest of the session, so later dictations neither wait for a doomed request nor lose the model preload; fix the cause and restart. A missing key keeps the daemon local from the start.
+- **Vocabulary.** The prompt from your vocabulary file is passed along: as `prompt` to Groq and OpenAI, as a provider option to OpenRouter where supported, and as part of the instruction to Gemini.
+- **Length.** Providers cap uploads at roughly 20–25 MB, about 10 minutes of dictation in one go.
 
 ## Custom vocabulary
 
@@ -236,22 +253,22 @@ venv\Scripts\pip install -r requirements.txt
 venv\Scripts\python -m pytest tests/ -v
 ```
 
-Tests cover the protocol framing, audio recorder / transcription wiring (with mocks), vocabulary parsing and hot-reload, post-processor edge cases, and the hallucination filter (with synthetic audio). The test suite does not require CUDA or a microphone.
+Tests cover the protocol framing, audio recorder / transcription wiring (with mocks), vocabulary parsing and hot-reload, post-processor edge cases, the hallucination filter (with synthetic audio), and the cloud backends (with mocked HTTP). The test suite does not require CUDA or a microphone.
 
 ### Layout
 
 ```
-daemon.py          TCP server, audio capture, Whisper wrapper
-hotkey.ahk         AutoHotkey v2 client (push-to-talk + paste)
-protocol.py        Length-prefixed framing
-vocabulary.py      Markdown parser + watchdog-backed store
-post_processor.py  Word-boundary find/replace + spoken punctuation commands
+daemon.py                TCP server, audio capture, Whisper wrapper, backend choice
+hotkey.ahk               AutoHotkey v2 client (push-to-talk + paste)
+protocol.py              Length-prefixed framing
+vocabulary.py            Markdown parser + watchdog-backed store
+post_processor.py        Word-boundary find/replace + spoken punctuation commands
 hallucination_filter.py  Drops accidental recordings and invented credits
-cloud_transcription.py   Optional cloud backends (Groq, OpenRouter)
-start.bat          Launches daemon + AHK, waits for port 9876
-stop.bat           Terminates both processes
-tests/             pytest suite
-docs/              Design specs and implementation plans
+cloud_transcription.py   Optional cloud backends (Groq, OpenAI, OpenRouter, Gemini)
+start.bat                Launches daemon + AHK, waits for port 9876
+stop.bat                 Terminates both processes
+tests/                   pytest suite
+docs/                    Design specs and implementation plans
 ```
 
 ## Troubleshooting
@@ -259,6 +276,8 @@ docs/              Design specs and implementation plans
 - **Tooltip says "Verbindung verloren" or never connects.** The daemon didn't start or crashed. Check `%APPDATA%\archilles-dictateur\daemon.log`.
 - **"Port 9876 already in use".** Another daemon is still running. Run `stop.bat`, or find and kill the lingering `python` process.
 - **"CUDA not available, falling back to CPU".** The daemon could not load Whisper on GPU. Check `nvidia-smi`, verify your CUDA runtime, and confirm the `nvidia-*` DLLs installed by `pip` are in `venv\Lib\site-packages\nvidia\*\bin`. CPU fallback is fine, just slower.
+- **Cloud backend seems slow, or the log says `failed permanently`.** The cloud call failed and the daemon fell back to the local model; the log line gives the provider's reason (wrong key, no credit, unknown model). Fix it and restart.
+- **Tooltip "📋 Fenster gewechselt".** You switched windows while the transcription was running; the text is on the clipboard — paste it with `Ctrl+V`.
 - **Nothing gets pasted.** The target application may filter `Ctrl+V`. Some terminals require a different paste shortcut; Dictateur currently only sends `Ctrl+V`.
 
 ## Known limitations

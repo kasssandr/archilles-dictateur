@@ -9,8 +9,11 @@ import numpy as np
 import pytest
 
 from cloud_transcription import (
+    BACKENDS,
     CloudTranscriptionError,
+    GeminiTranscriber,
     GroqTranscriber,
+    OpenAITranscriber,
     OpenRouterTranscriber,
     encode_wav,
     normalize_language,
@@ -101,7 +104,8 @@ def test_network_error_becomes_cloud_error(mock_urlopen):
         OpenRouterTranscriber(api_key="k").transcribe(AUDIO)
 
 
-@pytest.mark.parametrize("status, permanent", [(401, True), (402, True), (403, True), (429, False), (500, False), (None, False)])
+@pytest.mark.parametrize("status, permanent", [(401, True), (402, True), (403, True), (404, True),
+                                                (429, False), (500, False), (None, False)])
 def test_permanent_errors(status, permanent):
     assert CloudTranscriptionError("x", status=status).permanent is permanent
 
@@ -147,3 +151,83 @@ def test_groq_auto_language_is_not_sent(mock_urlopen):
 def test_groq_missing_key_names_variable():
     with pytest.raises(CloudTranscriptionError, match="GROQ_API_KEY"):
         GroqTranscriber(api_key="")
+
+
+@pytest.mark.parametrize("backend, key_variable", [
+    ("groq", "GROQ_API_KEY"), ("openai", "OPENAI_API_KEY"),
+    ("openrouter", "OPENROUTER_API_KEY"), ("gemini", "GEMINI_API_KEY"),
+])
+def test_backend_key_variable_matches_daemon_convention(backend, key_variable):
+    # daemon.main() reads f"{backend.upper()}_API_KEY"
+    assert BACKENDS[backend].key_variable == key_variable == f"{backend.upper()}_API_KEY"
+
+
+# --- OpenAI ---
+
+@patch("cloud_transcription.urllib.request.urlopen")
+def test_openai_uses_its_endpoint_and_whisper(mock_urlopen):
+    mock_urlopen.return_value = _response({"text": "Hello", "language": "english"})
+    assert OpenAITranscriber(api_key="ok").transcribe(AUDIO) == ("Hello", "en")
+    request = mock_urlopen.call_args.args[0]
+    assert request.full_url == "https://api.openai.com/v1/audio/transcriptions"
+    assert b"whisper-1" in request.data
+
+
+@patch("cloud_transcription.urllib.request.urlopen")
+def test_openai_reads_languages_list(mock_urlopen):
+    # gpt-transcribe rejects verbose_json and reports "languages" instead.
+    err = urllib.error.HTTPError("u", 400, "bad", {}, io.BytesIO(b"verbose_json not supported"))
+    mock_urlopen.side_effect = [err, _response({"text": "Hallo", "languages": [{"code": "de"}]})]
+    t = OpenAITranscriber(api_key="ok", model="gpt-transcribe")
+    assert t.transcribe(AUDIO) == ("Hallo", "de")
+
+
+# --- Gemini ---
+
+def _gemini_response(payload: dict) -> MagicMock:
+    return _response({"candidates": [{"content": {"parts": [{"text": json.dumps(payload)}]}}]})
+
+
+@patch("cloud_transcription.urllib.request.urlopen")
+def test_gemini_request_shape(mock_urlopen):
+    mock_urlopen.return_value = _gemini_response({"text": " Hallo Welt ", "language": "de"})
+    t = GeminiTranscriber(api_key="gk")
+    assert t.transcribe(AUDIO, initial_prompt="Kubernetes") == ("Hallo Welt", "de")
+
+    request = mock_urlopen.call_args.args[0]
+    assert request.full_url.endswith("/models/gemini-3.6-flash:generateContent")
+    assert request.get_header("X-goog-api-key") == "gk"
+    assert request.get_header("Authorization") is None
+    body = json.loads(request.data)
+    parts = body["contents"][0]["parts"]
+    assert "verbatim" in parts[0]["text"] and "never answer" in parts[0]["text"]
+    assert "Kubernetes" in parts[0]["text"]
+    assert parts[1]["inline_data"]["mime_type"] == "audio/wav"
+    assert base64.b64decode(parts[1]["inline_data"]["data"])[:4] == b"RIFF"
+    assert body["generationConfig"]["responseMimeType"] == "application/json"
+    assert body["generationConfig"]["temperature"] == 0
+
+
+@patch("cloud_transcription.urllib.request.urlopen")
+def test_gemini_pinned_language_goes_into_instruction(mock_urlopen):
+    mock_urlopen.return_value = _gemini_response({"text": "x", "language": ""})
+    _, lang = GeminiTranscriber(api_key="gk").transcribe(AUDIO, language="fr")
+    assert "'fr'" in json.loads(mock_urlopen.call_args.args[0].data)["contents"][0]["parts"][0]["text"]
+    assert lang == "fr"
+
+
+@patch("cloud_transcription.urllib.request.urlopen")
+def test_gemini_invalid_key_is_permanent_and_not_retried(mock_urlopen):
+    detail = b'{"error": {"code": 400, "message": "API key not valid.", "status": "INVALID_ARGUMENT", "details": [{"reason": "API_KEY_INVALID"}]}}'
+    mock_urlopen.side_effect = urllib.error.HTTPError("u", 400, "bad", {}, io.BytesIO(detail))
+    with pytest.raises(CloudTranscriptionError) as info:
+        GeminiTranscriber(api_key="bad").transcribe(AUDIO)
+    assert info.value.permanent
+    mock_urlopen.assert_called_once()
+
+
+@patch("cloud_transcription.urllib.request.urlopen")
+def test_gemini_blocked_response_raises(mock_urlopen):
+    mock_urlopen.return_value = _response({"promptFeedback": {"blockReason": "SAFETY"}})
+    with pytest.raises(CloudTranscriptionError, match="SAFETY"):
+        GeminiTranscriber(api_key="gk").transcribe(AUDIO)

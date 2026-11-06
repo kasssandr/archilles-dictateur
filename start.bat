@@ -22,14 +22,14 @@ REM (English stays English, German stays German). Pin to a code like "de"
 REM to force one language — steadier for very short utterances.
 REM set DICTATEUR_LANGUAGE=de
 
-REM Optional: transcribe in the cloud (groq or openrouter) instead of locally.
-REM The audio leaves this machine; the local model stays as a fallback when
-REM a cloud call fails. Set keys as user environment variables, not here
-REM (this file is in the repo):  setx GROQ_API_KEY gsk_...
-REM                              setx OPENROUTER_API_KEY sk-or-...
+REM Optional: transcribe in the cloud instead of locally — groq, openai,
+REM openrouter or gemini (see README.md → "Cloud backends"). The audio leaves
+REM this machine; the local model stays as a fallback when a cloud call fails.
+REM Set keys as user environment variables, not here (this file is in the
+REM repo), e.g.:  setx GROQ_API_KEY gsk_...   (likewise OPENAI_API_KEY,
+REM OPENROUTER_API_KEY, GEMINI_API_KEY)
 REM set DICTATEUR_BACKEND=groq
 REM set DICTATEUR_GROQ_MODEL=whisper-large-v3
-REM set DICTATEUR_OPENROUTER_MODEL=openai/whisper-large-v3
 
 REM Start daemon in background (expliziter venv-Pfad)
 start /B "" "%~dp0venv\Scripts\python.exe" "%~dp0daemon.py"

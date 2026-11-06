@@ -59,7 +59,7 @@ class DaemonConfig:
     # workloads can use it. 0 keeps the model resident for the whole session.
     idle_unload_minutes: float = 5.0
     # "local" (faster-whisper on this machine), or a cloud backend from
-    # cloud_transcription.BACKENDS ("openrouter", "groq"): the audio is sent
+    # cloud_transcription.BACKENDS (groq, openai, openrouter, gemini): the audio is sent
     # there and the local model is loaded only if a cloud call fails.
     backend: str = "local"
     cloud_model: str = ""  # empty: the backend's default model
