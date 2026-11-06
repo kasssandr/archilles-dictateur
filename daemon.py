@@ -11,8 +11,12 @@ from dataclasses import dataclass, field
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from hallucination_filter import filter_transcript, is_accidental_recording, longest_voiced_run
 from post_processor import apply_corrections, apply_voice_commands
 from vocabulary import VocabularyStore
+
+# Recordings shorter than this are transcribed without the vocabulary prompt.
+PROMPT_MIN_SECONDS = 1.0
 
 # NVIDIA DLL-Verzeichnisse registrieren (Windows: cublas64_12.dll etc.)
 if sys.platform == "win32":
@@ -231,12 +235,18 @@ class DaemonServer:
                     audio = self.recorder.stop()
                     self.logger.info("Recording stopped, %d samples", len(audio))
 
-                    if len(audio) == 0:
+                    rate = self.config.sample_rate
+                    if len(audio) == 0 or is_accidental_recording(audio, rate):
+                        self.logger.info("Dropped: %.2f s without speech", len(audio) / rate)
                         send_message(stream, "RESULT:")
                         continue
 
                     try:
-                        prompt = self.vocabulary.get_prompt()
+                        # On very short audio Whisper tends to echo the
+                        # initial_prompt back as the transcript, so the
+                        # vocabulary is only passed once there is enough speech.
+                        long_enough = len(audio) >= PROMPT_MIN_SECONDS * rate
+                        prompt = self.vocabulary.get_prompt() if long_enough else ""
                         with self._model_lock:
                             self._ensure_model()
                             text, detected_language = self.transcriber.transcribe(
@@ -245,6 +255,10 @@ class DaemonServer:
                                 initial_prompt=prompt,
                             )
                             self._last_used = time.monotonic()
+                        raw = text
+                        text = filter_transcript(text, longest_voiced_run(audio, rate))
+                        if text != raw.strip():
+                            self.logger.info("Hallucination filtered: %r -> %r", raw, text)
                         text = apply_corrections(text, self.vocabulary.get_corrections())
                         text = apply_voice_commands(text, detected_language)
                         self.logger.info("Transcribed: %s", text)

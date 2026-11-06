@@ -13,6 +13,8 @@ Dictateur is the dictation front-end of the **Archilles** toolchain — a small 
 - **Custom vocabulary, hot-reloaded.** Point the daemon at a Markdown file; it feeds domain terms to Whisper as an `initial_prompt` and applies deterministic find/replace corrections post-transcription. Edit the file in any editor — changes take effect immediately.
 - **Auto-detects the language.** Speak German or English and each recording is transcribed in the language you actually spoke, not translated. Pin one language with `DICTATEUR_LANGUAGE` if you prefer.
 - **Spoken punctuation, per language.** Say `neuer Absatz` / `new paragraph`, `Klammer auf` / `open paren`, `Anführungszeichen zu` / `unquote` and the like; the daemon inserts the symbol locally, using the command set for whichever language you spoke (German, English, Spanish, Italian, Russian, French). See [Voice commands](#voice-commands).
+- **Filters what Whisper invents.** Subtitle credits ("Untertitel im Auftrag des ZDF", "Thanks for watching"), a lone "Danke." on a cough, and accidental taps of the hotkey are dropped locally instead of pasted. See [Hallucination filter](#hallucination-filter).
+- **Pastes only where you started.** Switch windows while Whisper is still working and the text stays on the clipboard instead of landing in the wrong app.
 - **Works in any app.** Because results are pasted via the clipboard, Dictateur works in VS Code, browsers, Word, Obsidian, Claude Code terminals — anything that accepts paste.
 - **No GUI.** A background Python daemon plus an AutoHotkey v2 script. Start and forget.
 
@@ -142,6 +144,17 @@ prompter -> prompt
 - `<!-- HTML comments -->` are stripped before parsing, so you can annotate freely.
 - German headers `## Vokabular` and `## Korrekturen` are also recognised as aliases.
 
+## Hallucination filter
+
+Whisper was trained on subtitled video and fills silence with what it saw there. `vad_filter` removes most silence before decoding; `hallucination_filter.py` catches the rest, locally and without a second model:
+
+- **Accidental recordings are not transcribed.** Under 0.3 s, or under 3 s without a stretch of speech long enough to be a word (measured with a simple energy meter over 30 ms frames), the daemon returns nothing and the model never runs.
+- **Credits are dropped.** A transcript that is only a subtitle credit or a sign-off ("Untertitel der Amara.org-Community", "Vielen Dank fürs Zuschauen", "Thanks for watching") is discarded; the same phrases at the end of a real dictation are cut off.
+- **Doubtful phrases need speech.** "Danke.", "Okay.", "Thank you." and the like are kept when you said them, and dropped when the recording holds less than 0.3 s of continuous speech — the cough-or-click case.
+- **No vocabulary prompt under 1 s.** On very short audio Whisper tends to echo its `initial_prompt` back as the transcript, so recordings shorter than a second are transcribed without it.
+
+Filtered transcripts are logged (`Hallucination filtered: ...`) so you can check what was removed. The phrase lists live in `CREDITS` and `DOUBTFUL_PHRASES` in `hallucination_filter.py`.
+
 ## Voice commands
 
 Whisper already sets commas and sentence periods from prosody. For punctuation and
@@ -198,7 +211,7 @@ venv\Scripts\pip install -r requirements.txt
 venv\Scripts\python -m pytest tests/ -v
 ```
 
-Tests cover the protocol framing, audio recorder / transcription wiring (with mocks), vocabulary parsing and hot-reload, and post-processor edge cases. The test suite does not require CUDA or a microphone.
+Tests cover the protocol framing, audio recorder / transcription wiring (with mocks), vocabulary parsing and hot-reload, post-processor edge cases, and the hallucination filter (with synthetic audio). The test suite does not require CUDA or a microphone.
 
 ### Layout
 
@@ -208,6 +221,7 @@ hotkey.ahk         AutoHotkey v2 client (push-to-talk + paste)
 protocol.py        Length-prefixed framing
 vocabulary.py      Markdown parser + watchdog-backed store
 post_processor.py  Word-boundary find/replace + spoken punctuation commands
+hallucination_filter.py  Drops accidental recordings and invented credits
 start.bat          Launches daemon + AHK, waits for port 9876
 stop.bat           Terminates both processes
 tests/             pytest suite
@@ -237,3 +251,4 @@ MIT — see [LICENSE](LICENSE).
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — the CTranslate2-based Whisper implementation that does the heavy lifting.
 - [AutoHotkey v2](https://www.autohotkey.com/) — the only sane way to bind a global hotkey on Windows.
 - [watchdog](https://github.com/gorakhargosh/watchdog) — for the vocabulary hot-reload.
+- [Blitztext](https://github.com/cmagnussen/blitztext-app) (MIT) — the hallucination filter's phrase lists, thresholds and speech meter follow its `HallucinationFilter`.

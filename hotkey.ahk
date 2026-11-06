@@ -12,6 +12,7 @@ global RECONNECT_INTERVAL := 5000  ; ms
 global sock := 0
 global isConnected := false
 global isRecording := false
+global targetHwnd := 0  ; window that had focus when recording started
 
 ; --- TCP Helpers ---
 
@@ -107,10 +108,11 @@ SocketClose(s) {
 ; --- Hotkey: Ctrl+Win (LWin preferred) ---
 
 ^LWin:: {
-    global isRecording, isConnected, sock
+    global isRecording, isConnected, sock, targetHwnd
     if isRecording || !isConnected
         return
     isRecording := true
+    targetHwnd := WinExist("A")
     try {
         SendMsg(sock, "START")
         ToolTip("🎤 Aufnahme...")
@@ -124,7 +126,7 @@ SocketClose(s) {
 }
 
 ^LWin up:: {
-    global isRecording, isConnected, sock
+    global isRecording, isConnected, sock, targetHwnd
     if !isRecording
         return
     isRecording := false
@@ -137,7 +139,14 @@ SocketClose(s) {
 
         if SubStr(response, 1, 7) = "RESULT:" {
             text := SubStr(response, 8)
-            if text != "" {
+            if text != "" && targetHwnd && !WinActive("ahk_id " targetHwnd) {
+                ; The user switched windows while Whisper was working. Pasting
+                ; now would drop the text into the wrong app, so leave it on
+                ; the clipboard instead (no restore — it is the only copy).
+                A_Clipboard := text
+                ToolTip("📋 Fenster gewechselt – Text liegt in der Zwischenablage")
+                SetTimer(() => ToolTip(), -3000)
+            } else if text != "" {
                 ; Save clipboard, paste transcription, restore clipboard —
                 ; dictation must not clobber whatever the user had copied.
                 clipSaved := ClipboardAll()
